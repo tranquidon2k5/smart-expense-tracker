@@ -1,30 +1,69 @@
 import {
+  Baby,
   Bike,
+  BookOpen,
   Briefcase,
+  Bus,
+  Car,
   Clapperboard,
+  Coffee,
   Coins,
+  Dumbbell,
+  Fuel,
+  Gamepad2,
   Gift,
   GraduationCap,
   HeartPulse,
+  House,
+  Landmark,
+  Music,
+  PawPrint,
+  PiggyBank,
+  Plane,
   Shapes,
+  Shirt,
   ShoppingBag,
+  ShoppingCart,
+  Smartphone,
+  TrendingUp,
   Utensils,
+  Wifi,
   Zap,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const ICONS: Record<string, LucideIcon> = {
+/** Registry icon danh mục — khớp CATEGORY_ICON_OPTIONS trong lib/category-style.ts */
+export const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Baby,
   Bike,
+  BookOpen,
   Briefcase,
+  Bus,
+  Car,
   Clapperboard,
+  Coffee,
   Coins,
+  Dumbbell,
+  Fuel,
+  Gamepad2,
   Gift,
   GraduationCap,
   HeartPulse,
+  House,
+  Landmark,
+  Music,
+  PawPrint,
+  PiggyBank,
+  Plane,
   Shapes,
+  Shirt,
   ShoppingBag,
+  ShoppingCart,
+  Smartphone,
+  TrendingUp,
   Utensils,
+  Wifi,
   Zap,
 };
 
@@ -37,7 +76,7 @@ interface CategoryIconProps {
 
 /** Icon danh mục trong vòng tròn nền màu danh mục 12% (trang trí, aria-hidden) */
 export function CategoryIcon({ icon, color, size = "md", className }: CategoryIconProps) {
-  const Icon = ICONS[icon] ?? Shapes;
+  const Icon = CATEGORY_ICONS[icon] ?? Shapes;
   return (
     <span
       aria-hidden

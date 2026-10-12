@@ -18,8 +18,8 @@ import type {
 import * as db from "./mock/db";
 import { failIfErrorScenario, simulateLatency } from "./mock/scenario";
 import {
-  addXp,
   applyToWallet,
+  awardXp,
   bumpMission,
   normalize,
   recordActivity,
@@ -30,9 +30,6 @@ import {
 import { emitDataChanged } from "./events";
 import { extractKeyword, matchesKeyword, planRuleApplication } from "./rules";
 
-/** XP theo PRD §6.4 */
-const XP_ADD_TRANSACTION = 10;
-const XP_REVIEW = 5;
 /** Ngưỡng độ tin cậy: thấp hơn → hàng chờ duyệt (PRD §9.1) */
 export const CONFIDENCE_THRESHOLD = 0.7;
 
@@ -284,13 +281,19 @@ export async function reviewTransaction(id: string, categoryId?: string): Promis
   }
   t.status = "confirmed";
 
-  addXp(XP_REVIEW);
+  const xp = awardXp("review");
   recordActivity();
   bumpMission("m-d-review");
 
   const ruleSuggestion = changed ? buildRuleSuggestion(t, categoryId!) : null;
   emitDataChanged();
-  return { transaction: toView(t), xpGained: XP_REVIEW, ruleSuggestion, remainingPending: pendingCount() };
+  return {
+    transaction: toView(t),
+    xpGained: xp.xp,
+    xpLimitReached: xp.limitReached,
+    ruleSuggestion,
+    remainingPending: pendingCount(),
+  };
 }
 
 // ───────────── Ghi nhanh bằng câu tự nhiên (giả lập F07 + F08) ─────────────
@@ -417,11 +420,17 @@ export async function createFromQuickEntry(preview: QuickEntryPreview): Promise<
   applyToWallet(transaction, 1);
 
   // Gamification: +10 XP, cập nhật chuỗi ngày và nhiệm vụ "Ghi 3 giao dịch"
-  addXp(XP_ADD_TRANSACTION);
+  const xp = awardXp("add_transaction");
   let message = db.motivationMessages.find((m) => m.context === "after_transaction")!.template;
   if (recordActivity()) message = `Chuỗi ${db.streak.currentStreak} ngày rồi! ${message}`;
   bumpMission("m-d-3tx");
 
   emitDataChanged();
-  return { transaction: toView(transaction), xpGained: XP_ADD_TRANSACTION, streak: { ...db.streak }, message };
+  return {
+    transaction: toView(transaction),
+    xpGained: xp.xp,
+    xpLimitReached: xp.limitReached,
+    streak: { ...db.streak },
+    message,
+  };
 }

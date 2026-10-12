@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { QuickEntryPreview } from "@/types";
 import { transactionService } from "@/services";
 import { formatMoney } from "@/lib/format";
+import { XP_LIMIT_NOTE, xpSuffix } from "@/lib/xp";
 
 type Status = "idle" | "parsing" | "preview" | "saving";
 
@@ -44,8 +45,8 @@ export function useQuickEntry(onSaved?: () => void) {
     setStatus("saving");
     try {
       const result = await transactionService.createFromQuickEntry(preview);
-      toast.success(`Đã lưu ${formatMoney(result.transaction.amount)} · +${result.xpGained} XP`, {
-        description: result.message,
+      toast.success(`Đã lưu ${formatMoney(result.transaction.amount)}${xpSuffix(result)}`, {
+        description: result.xpLimitReached ? XP_LIMIT_NOTE.add_transaction : result.message,
       });
       setText("");
       setPreview(null);

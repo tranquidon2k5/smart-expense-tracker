@@ -6,6 +6,7 @@
 import type {
   Badge,
   ClassificationRule,
+  WalletTransfer,
   Budget,
   Category,
   Mission,
@@ -54,6 +55,8 @@ export const categories: Category[] = [
   { id: "c-salary", userId: null, name: "Lương", type: "income", icon: "Briefcase", color: "#15803D" },
   { id: "c-bonus", userId: null, name: "Thưởng", type: "income", icon: "Gift", color: "#15803D" },
   { id: "c-income-other", userId: null, name: "Thu khác", type: "income", icon: "Coins", color: "#15803D" },
+  // Danh mục người dùng tự tạo (F03) — sửa/xoá được
+  { id: "c-u-pet", userId: USER_ID, name: "Thú cưng", type: "expense", icon: "PawPrint", color: "#A16207" },
 ];
 
 // ───────────── Sinh giao dịch tháng 5 → tháng 9 ─────────────
@@ -245,6 +248,13 @@ for (const [date, cat, amount, desc, wallet, extra] of october) add(date, cat, a
 
 export const transactions: Transaction[] = generated;
 
+// Chuyển tiền giữa ví (F02) — không phải thu/chi nên lưu riêng
+export const transfers: WalletTransfer[] = [
+  { id: "tf-1", userId: USER_ID, fromWalletId: "w-vcb", toWalletId: "w-momo", amount: 1_000_000, date: "2026-10-10", note: "Nạp MoMo sau khi nhận lương", createdAt: "2026-10-10T19:02:00+07:00" },
+  { id: "tf-2", userId: USER_ID, fromWalletId: "w-vcb", toWalletId: "w-cash", amount: 1_500_000, date: "2026-10-02", note: "Rút tiền mặt ATM", createdAt: "2026-10-02T12:15:00+07:00" },
+  { id: "tf-3", userId: USER_ID, fromWalletId: "w-vcb", toWalletId: "w-tcb", amount: 3_000_000, date: "2026-09-11", note: "Chuyển sang tài khoản chi tiêu", createdAt: "2026-09-11T08:40:00+07:00" },
+];
+
 // Luật từ khoá (F08): luật mặc định + luật người dùng tạo khi sửa phân loại
 export const classificationRules: ClassificationRule[] = [
   { id: "r-1", userId: USER_ID, keyword: "SHOPEE", categoryId: "c-shop", createdFrom: "user" },
@@ -328,4 +338,10 @@ export const motivationMessages: MotivationMessage[] = [
 /** Trạng thái phiên demo — thay đổi khi người dùng ghi giao dịch */
 export const session = {
   activeToday: false,
+  /** Số lần đã nhận XP trong ngày theo từng loại hành động (giới hạn PRD §6.4) */
+  xpCounts: { date: MOCK_TODAY, add_transaction: 0, review: 0 } as {
+    date: string;
+    add_transaction: number;
+    review: number;
+  },
 };

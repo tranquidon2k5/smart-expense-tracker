@@ -7,4 +7,7 @@
 export * as dashboardService from "./dashboard.service";
 export * as transactionService from "./transaction.service";
 export * as gamificationService from "./gamification.service";
+export * as budgetService from "./budget.service";
+export * as walletService from "./wallet.service";
+export * as categoryService from "./category.service";
 export { onDataChanged } from "./events";

@@ -290,6 +290,8 @@ export interface QuickEntryPreview {
 export interface QuickEntryResult {
   transaction: TransactionView;
   xpGained: number;
+  /** Đã đủ 10 lần nhận XP ghi giao dịch hôm nay → lần này không cộng XP */
+  xpLimitReached: boolean;
   streak: UserStreak;
   message: string;
 }
@@ -340,6 +342,8 @@ export interface UpdateResult {
 export interface ReviewResult {
   transaction: TransactionView;
   xpGained: number;
+  /** Đã đủ 10 lần nhận XP duyệt giao dịch hôm nay → lần này không cộng XP */
+  xpLimitReached: boolean;
   ruleSuggestion: RuleSuggestion | null;
   remainingPending: number;
 }
@@ -361,6 +365,73 @@ export interface RulePreview {
   applicableCount: number;
   /** Số giao dịch sẽ bị đổi từ danh mục khác sang danh mục của luật */
   conflictCount: number;
+}
+
+// ───────────── Ngân sách (F05) ─────────────
+
+export interface BudgetRow extends BudgetProgress {
+  /** Chi trung bình 3 tháng trước của danh mục — gợi ý khi đặt hạn mức */
+  avgSpendLast3Months: number;
+}
+
+export interface BudgetOverview {
+  month: string;
+  rows: BudgetRow[];
+  /** Danh mục chi chưa có hạn mức tháng này, kèm chi trung bình để gợi ý */
+  unbudgeted: { category: Category; spent: number; avgSpendLast3Months: number }[];
+  totalLimit: number;
+  totalSpent: number;
+}
+
+// ───────────── Ví (F02) ─────────────
+
+/** Chuyển tiền giữa hai ví — không tính là thu hay chi */
+export interface WalletTransfer {
+  id: ID;
+  userId: ID;
+  fromWalletId: ID;
+  toWalletId: ID;
+  amount: number;
+  date: ISODate;
+  note: string;
+  createdAt: ISODateTime;
+}
+
+export interface WalletSummary extends Wallet {
+  monthIncome: number;
+  monthExpense: number;
+  transactionCount: number;
+}
+
+export interface TransferInput {
+  fromWalletId: ID;
+  toWalletId: ID;
+  amount: number;
+  date: ISODate;
+  note: string;
+}
+
+export interface TransferView extends WalletTransfer {
+  fromWallet: Wallet;
+  toWallet: Wallet;
+}
+
+// ───────────── Danh mục (F03) ─────────────
+
+export interface CategoryUsage {
+  category: Category;
+  /** Danh mục mặc định của hệ thống — không sửa/xoá được */
+  isDefault: boolean;
+  transactionCount: number;
+  monthAmount: number;
+  hasBudget: boolean;
+}
+
+export interface CategoryInput {
+  name: string;
+  type: TransactionType;
+  icon: string;
+  color: string;
 }
 
 export interface CreateRuleResult {

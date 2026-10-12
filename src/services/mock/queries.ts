@@ -27,8 +27,39 @@ export function applyToWallet(t: Pick<Transaction, "walletId" | "type" | "amount
   if (wallet) wallet.balance += sign * (t.type === "income" ? t.amount : -t.amount);
 }
 
-export function addXp(amount: number): void {
-  db.level.totalXp += amount;
+/** Bảng điểm XP có giới hạn theo ngày (PRD §6.4) */
+export const XP_RULES = {
+  add_transaction: { xp: 10, dailyLimit: 10 },
+  review: { xp: 5, dailyLimit: 10 },
+} as const;
+export type XpAction = keyof typeof XP_RULES;
+
+export interface XpAward {
+  xp: number;
+  /** true khi hành động này đã chạm giới hạn trong ngày → không cộng XP */
+  limitReached: boolean;
+  /** Số lần đã được cộng XP hôm nay cho loại hành động này (sau lần này) */
+  countToday: number;
+}
+
+/**
+ * Cộng XP cho một hành động, tối đa `dailyLimit` lần/ngày mỗi loại (chống spam).
+ * Bộ đếm reset khi sang ngày mới theo múi giờ người dùng.
+ */
+export function awardXp(action: XpAction, today: string = db.MOCK_TODAY): XpAward {
+  const counts = db.session.xpCounts;
+  if (counts.date !== today) {
+    counts.date = today;
+    counts.add_transaction = 0;
+    counts.review = 0;
+  }
+  const rule = XP_RULES[action];
+  if (counts[action] >= rule.dailyLimit) {
+    return { xp: 0, limitReached: true, countToday: counts[action] };
+  }
+  counts[action] += 1;
+  db.level.totalXp += rule.xp;
+  return { xp: rule.xp, limitReached: false, countToday: counts[action] };
 }
 
 /**

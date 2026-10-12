@@ -4,6 +4,7 @@ import {
   PiggyBank,
   ReceiptText,
   Settings,
+  Shapes,
   Trophy,
   Wallet,
   type LucideIcon,
@@ -21,7 +22,8 @@ export const NAV_MAIN: NavItem[] = [
   { href: "/", label: "Tổng quan", icon: LayoutDashboard, keywords: "dashboard trang chu" },
   { href: "/giao-dich", label: "Giao dịch", icon: ReceiptText, keywords: "thu chi lich su" },
   { href: "/ngan-sach", label: "Ngân sách", icon: PiggyBank, keywords: "han muc budget" },
-  { href: "/vi", label: "Ví", icon: Wallet, keywords: "tai khoan ngan hang momo tien mat" },
+  { href: "/vi", label: "Ví", icon: Wallet, keywords: "tai khoan ngan hang momo tien mat chuyen tien" },
+  { href: "/danh-muc", label: "Danh mục", icon: Shapes, keywords: "phan loai thu chi icon mau" },
   { href: "/tro-ly", label: "Trợ lý AI", icon: MessageCircle, keywords: "chatbot hoi dap" },
   { href: "/thanh-tich", label: "Thành tích", icon: Trophy, keywords: "chuoi huy hieu xp cap do" },
 ];

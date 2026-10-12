@@ -169,7 +169,11 @@ export function TransactionsPage() {
   const [deleteIds, setDeleteIds] = React.useState<string[] | null>(null);
   const [deleting, setDeleting] = React.useState(false);
 
-  const { state, update, reset, filter, filterKey } = useTransactionFilters(today, searchParams.get("danh-muc"));
+  const { state, update, reset, filter, filterKey } = useTransactionFilters(
+    today,
+    searchParams.get("danh-muc"),
+    searchParams.get("vi"),
+  );
   const list = useServiceQuery(() => transactionService.listTransactions(filter), filterKey);
   const categories = useServiceQuery(() => transactionService.listCategories()).data ?? EMPTY_CATEGORIES;
   const wallets = useServiceQuery(() => transactionService.listWallets()).data ?? EMPTY_WALLETS;

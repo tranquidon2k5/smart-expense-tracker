@@ -28,6 +28,7 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { transactionService } from "@/services";
 import { formatDate, formatMoney, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { XP_LIMIT_NOTE, xpSuffix } from "@/lib/xp";
 import { RuleSuggestionPrompt } from "./rule-suggestion";
 
 const vnd = new Intl.NumberFormat("vi-VN");
@@ -129,8 +130,12 @@ function TransactionEditor({
       const { categoryId, ...rest } = patch;
       if (Object.keys(rest).length) await transactionService.updateTransaction(tx.id, rest);
       const result = await transactionService.reviewTransaction(tx.id, categoryId);
-      toast.success(`Đã duyệt · +${result.xpGained} XP`, {
-        description: result.remainingPending ? `Còn ${result.remainingPending} giao dịch chờ duyệt.` : "Bạn đã duyệt hết giao dịch chờ!",
+      toast.success(`Đã duyệt${xpSuffix(result)}`, {
+        description: result.xpLimitReached
+          ? XP_LIMIT_NOTE.review
+          : result.remainingPending
+            ? `Còn ${result.remainingPending} giao dịch chờ duyệt.`
+            : "Bạn đã duyệt hết giao dịch chờ!",
       });
       setSuggestion(result.ruleSuggestion);
     } catch (e) {

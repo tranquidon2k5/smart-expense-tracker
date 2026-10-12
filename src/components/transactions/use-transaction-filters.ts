@@ -28,11 +28,11 @@ export interface FilterState {
   query: string;
 }
 
-export function defaultFilters(categoryId?: string | null): FilterState {
+export function defaultFilters(categoryId?: string | null, walletId?: string | null): FilterState {
   return {
     period: "thang-nay",
     range: {},
-    walletIds: [],
+    walletIds: walletId ? [walletId] : [],
     categoryIds: categoryId ? [categoryId] : [],
     query: "",
   };
@@ -84,8 +84,8 @@ export function activeFilterCount(state: FilterState): number {
 }
 
 /** Trạng thái lọc + chuỗi tìm kiếm đã debounce → TransactionFilter cho service */
-export function useTransactionFilters(today: string, initialCategoryId?: string | null) {
-  const [state, setState] = React.useState<FilterState>(() => defaultFilters(initialCategoryId));
+export function useTransactionFilters(today: string, initialCategoryId?: string | null, initialWalletId?: string | null) {
+  const [state, setState] = React.useState<FilterState>(() => defaultFilters(initialCategoryId, initialWalletId));
   const [debouncedQuery, setDebouncedQuery] = React.useState(state.query);
 
   React.useEffect(() => {

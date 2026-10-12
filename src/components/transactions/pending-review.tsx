@@ -15,6 +15,7 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { transactionService } from "@/services";
 import { formatDate, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { XP_LIMIT_NOTE, xpSuffix } from "@/lib/xp";
 import { CategoryCommand } from "./category-command";
 import { RuleSuggestionPrompt } from "./rule-suggestion";
 
@@ -66,7 +67,9 @@ export function PendingReview({
     try {
       const result = await transactionService.reviewTransaction(t.id, categoryId);
       setReviewedCount((n) => n + 1);
-      toast.success(`Đã duyệt “${t.description}” · +${result.xpGained} XP`);
+      toast.success(`Đã duyệt “${t.description}”${xpSuffix(result)}`, {
+        description: result.xpLimitReached ? XP_LIMIT_NOTE.review : undefined,
+      });
       restoreFocus.current = true;
       if (result.ruleSuggestion) setSuggestion(result.ruleSuggestion);
     } catch (e) {
