@@ -1,38 +1,11 @@
-import type {
-  BudgetProgress,
-  CategoryBreakdown,
-  CategorySlice,
-  DashboardSummary,
-  MonthlyTrendPoint,
-  MonthTotals,
-  Transaction,
-} from "@/types";
+import type { BudgetProgress, CategoryBreakdown, DashboardSummary, MonthlyTrendPoint } from "@/types";
 import * as db from "./mock/db";
 import { getScenario, simulateLatency } from "./mock/scenario";
-import { scopedTransactions, scopedWallets } from "./mock/queries";
+import { buildBreakdown, confirmedTransactions, scopedTransactions, scopedWallets, shiftMonth, sumTotals } from "./mock/queries";
 
 const CURRENT_MONTH = db.MOCK_TODAY.slice(0, 7);
-
-/** Chỉ tính giao dịch đã xác nhận; giao dịch chờ duyệt chưa vào thống kê */
-function confirmed(): Transaction[] {
-  return scopedTransactions().filter((t) => t.status === "confirmed");
-}
-
-function totals(list: Transaction[]): MonthTotals {
-  return list.reduce(
-    (acc, t) => {
-      acc[t.type] += t.amount;
-      return acc;
-    },
-    { income: 0, expense: 0 },
-  );
-}
-
-function shiftMonth(month: string, delta: number): string {
-  const [y, m] = month.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return d.toISOString().slice(0, 7);
-}
+const confirmed = confirmedTransactions;
+const totals = sumTotals;
 
 export function getCurrentMonth(): string {
   return CURRENT_MONTH;
@@ -88,22 +61,7 @@ export async function getMonthlyTrend(months = 6): Promise<MonthlyTrendPoint[]> 
 export async function getCategoryBreakdown(maxSlices = 5): Promise<CategoryBreakdown> {
   await simulateLatency();
   const expenses = confirmed().filter((t) => t.type === "expense" && t.date.startsWith(CURRENT_MONTH));
-  const byCategory = new Map<string, number>();
-  for (const t of expenses) byCategory.set(t.categoryId, (byCategory.get(t.categoryId) ?? 0) + t.amount);
-
-  const total = expenses.reduce((s, t) => s + t.amount, 0);
-  const sorted = [...byCategory.entries()].sort((a, b) => b[1] - a[1]);
-  const head = sorted.length > maxSlices ? sorted.slice(0, maxSlices - 1) : sorted;
-  const restAmount = sorted.slice(head.length).reduce((s, [, v]) => s + v, 0);
-
-  const slices: CategorySlice[] = head.map(([id, amount]) => {
-    const c = db.categories.find((x) => x.id === id)!;
-    return { categoryId: id, name: c.name, color: c.color, amount, percent: (amount / total) * 100 };
-  });
-  if (restAmount > 0) {
-    slices.push({ categoryId: null, name: "Khác", color: "#64748B", amount: restAmount, percent: (restAmount / total) * 100 });
-  }
-  return { month: CURRENT_MONTH, total, slices };
+  return buildBreakdown(expenses, CURRENT_MONTH, maxSlices);
 }
 
 /** Ngân sách tháng này, sắp xếp theo mức dùng giảm dần */

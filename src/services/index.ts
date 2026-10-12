@@ -12,3 +12,5 @@ export * as walletService from "./wallet.service";
 export * as categoryService from "./category.service";
 export * as chatService from "./chat.service";
 export { onCelebrate, onDataChanged, type Celebration } from "./events";
+export * as importService from "./import.service";
+export * as statsService from "./stats.service";

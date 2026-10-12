@@ -64,6 +64,10 @@
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-success: var(--success);
+  --color-warning-soft: var(--warning-soft);
+  --color-compare-prev: var(--compare-prev);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -139,6 +143,11 @@
   --warning: #b45309;
   --danger: #dc2626;
   --info: #0369a1;
+  --info-soft: #e0f2fe;
+  --success: #15803d;
+  --warning-soft: #fef3c7;
+  /* Biểu đồ so sánh hai tháng: tháng trước xám (3.49:1), tháng được so dùng --primary */
+  --compare-prev: #7c8d86;
 
   --chart-1: #2563eb;
   --chart-2: #7c3aed;

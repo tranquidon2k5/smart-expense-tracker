@@ -37,11 +37,14 @@ export function CategoryDonut({
   data,
   loading,
   onAddFirst,
+  periodLabel,
   className,
 }: {
   data?: CategoryBreakdown;
   loading: boolean;
-  onAddFirst: () => void;
+  onAddFirst?: () => void;
+  /** Mặc định "tháng 10/2026"; trang Thống kê truyền khoảng tháng đang xem */
+  periodLabel?: string;
   className?: string;
 }) {
   const [asTable, setAsTable] = React.useState(false);
@@ -54,8 +57,8 @@ export function CategoryDonut({
       title="Chi theo danh mục"
       description={
         top && data
-          ? `${top.name} chiếm nhiều nhất: ${formatPercent(top.percent)} tổng chi ${formatMonthLong(data.month).toLowerCase()}`
-          : "Tỷ lệ chi tiêu của từng danh mục trong tháng"
+          ? `${top.name} chiếm nhiều nhất: ${formatPercent(top.percent)} tổng chi ${periodLabel ?? formatMonthLong(data.month).toLowerCase()}`
+          : `Tỷ lệ chi tiêu của từng danh mục ${periodLabel ?? "trong tháng"}`
       }
       className={className}
       action={
@@ -87,9 +90,9 @@ export function CategoryDonut({
         <EmptyState
           icon={ChartPie}
           className="min-h-[320px]"
-          title="Chưa có khoản chi nào tháng này"
+          title={periodLabel ? "Chưa có khoản chi nào trong khoảng này" : "Chưa có khoản chi nào tháng này"}
           description="Ghi khoản chi đầu tiên để xem tiền của bạn đi đâu."
-          action={<Button onClick={onAddFirst}>Ghi khoản chi</Button>}
+          action={onAddFirst && <Button onClick={onAddFirst}>Ghi khoản chi</Button>}
         />
       ) : asTable ? (
         <Table aria-label="Chi theo danh mục">

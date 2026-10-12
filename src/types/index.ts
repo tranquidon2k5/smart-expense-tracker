@@ -517,3 +517,109 @@ export interface CreateRuleResult {
   /** Số giao dịch chờ duyệt đã được phân loại lại theo luật mới */
   appliedCount: number;
 }
+
+// ───────────── Nhập sao kê CSV (F09) ─────────────
+
+export type ImportField = "date" | "amount" | "description";
+
+/** Cách hiểu dấu của cột số tiền */
+export type AmountMode =
+  /** Số âm là chi, số dương là thu (sao kê ngân hàng thường gặp) */
+  | "signed"
+  /** Mọi dòng đều là khoản chi (sao kê thẻ tín dụng, ví chỉ ghi số dương) */
+  | "all_expense";
+
+/** Chỉ số cột (bắt đầu từ 0) cho từng trường; null = chưa chọn */
+export type CsvColumnMapping = Record<ImportField, number | null>;
+
+export interface ParsedCsv {
+  fileName: string;
+  delimiter: string;
+  hasHeader: boolean;
+  /** Tên cột (lấy từ dòng tiêu đề, không có thì "Cột 1", "Cột 2"…) */
+  headers: string[];
+  /** Các dòng dữ liệu, đã bỏ dòng trống, mỗi dòng đủ số cột */
+  rows: string[][];
+  /** Số dòng thật trong file của từng phần tử `rows` (để báo lỗi đúng dòng) */
+  lineNumbers: number[];
+}
+
+export interface ImportRowError {
+  line: number;
+  field: ImportField;
+  /** Giá trị gốc trong file */
+  value: string;
+  message: string;
+}
+
+export interface ImportCandidate {
+  line: number;
+  date: ISODate;
+  amount: number;
+  type: TransactionType;
+  description: string;
+}
+
+export interface ImportDuplicate extends ImportCandidate {
+  /** existing: trùng giao dịch đã có trong ví; in_file: lặp lại một dòng phía trên trong file */
+  reason: "existing" | "in_file";
+  matchId?: ID;
+  matchDescription?: string;
+  matchLine?: number;
+}
+
+export interface ImportRequest {
+  file: ParsedCsv;
+  mapping: CsvColumnMapping;
+  amountMode: AmountMode;
+  walletId: ID;
+}
+
+export interface ImportResult {
+  fileName: string;
+  wallet: Wallet;
+  /** Giao dịch mới đã tạo (gồm cả đã ghi thẳng và chờ duyệt) */
+  created: TransactionView[];
+  confirmedCount: number;
+  pendingCount: number;
+  duplicates: ImportDuplicate[];
+  errors: ImportRowError[];
+}
+
+// ───────────── Thống kê (F06) ─────────────
+
+export interface StatsRange {
+  /** "2026-05" */
+  from: string;
+  /** "2026-10" (tính cả tháng này) */
+  to: string;
+}
+
+export interface StatsOverview {
+  range: StatsRange;
+  totals: MonthTotals;
+  /** Số tháng trong khoảng */
+  monthCount: number;
+  transactionCount: number;
+  /** Mỗi tháng trong khoảng, kể cả tháng không có giao dịch (thu/chi = 0) */
+  trend: MonthlyTrendPoint[];
+  breakdown: CategoryBreakdown;
+  topExpenses: TransactionView[];
+}
+
+export interface CategoryComparisonRow {
+  categoryId: ID | null;
+  name: string;
+  color: string;
+  amountA: number;
+  amountB: number;
+}
+
+export interface MonthComparison {
+  monthA: string;
+  monthB: string;
+  totalsA: MonthTotals;
+  totalsB: MonthTotals;
+  /** Chi theo danh mục của hai tháng, sắp theo tổng hai tháng giảm dần; tối đa 5 dòng + "Khác" */
+  rows: CategoryComparisonRow[];
+}

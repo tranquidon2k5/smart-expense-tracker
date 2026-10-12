@@ -1,4 +1,6 @@
 import {
+  ChartColumn,
+  FileUp,
   LayoutDashboard,
   MessageCircle,
   PiggyBank,
@@ -21,6 +23,8 @@ export interface NavItem {
 export const NAV_MAIN: NavItem[] = [
   { href: "/", label: "Tổng quan", icon: LayoutDashboard, keywords: "dashboard trang chu" },
   { href: "/giao-dich", label: "Giao dịch", icon: ReceiptText, keywords: "thu chi lich su" },
+  { href: "/thong-ke", label: "Thống kê", icon: ChartColumn, keywords: "bieu do bao cao xu huong so sanh thang" },
+  { href: "/nhap-sao-ke", label: "Nhập sao kê", icon: FileUp, keywords: "import csv ngan hang file excel" },
   { href: "/ngan-sach", label: "Ngân sách", icon: PiggyBank, keywords: "han muc budget" },
   { href: "/vi", label: "Ví", icon: Wallet, keywords: "tai khoan ngan hang momo tien mat chuyen tien" },
   { href: "/danh-muc", label: "Danh mục", icon: Shapes, keywords: "phan loai thu chi icon mau" },
@@ -33,4 +37,6 @@ export const NAV_SECONDARY: NavItem[] = [
 ];
 
 /** Bottom nav < 768px: 4 mục + nút Ghi nhanh ở giữa (MASTER.md › Responsive) */
-export const NAV_MOBILE: NavItem[] = [NAV_MAIN[0], NAV_MAIN[1], NAV_MAIN[4], NAV_MAIN[5]];
+export const NAV_MOBILE: NavItem[] = ["/", "/giao-dich", "/danh-muc", "/tro-ly-ai"].map(
+  (href) => NAV_MAIN.find((n) => n.href === href)!,
+);

@@ -4,6 +4,13 @@ import * as db from "./mock/db";
 import * as categoryService from "./category.service";
 import * as walletService from "./wallet.service";
 
+/** Gắn handler trước khi chạy đồng hồ giả, tránh cảnh báo "unhandled rejection" */
+async function expectRejects(promise: Promise<unknown>, message: RegExp) {
+  const assertion = expect(promise).rejects.toThrow(message);
+  await vi.runAllTimersAsync();
+  await assertion;
+}
+
 async function run<T>(promise: Promise<T>): Promise<T> {
   await vi.runAllTimersAsync();
   return promise;
@@ -66,14 +73,14 @@ describe("categoryService — F03", () => {
   });
 
   it("không xoá được danh mục mặc định", async () => {
-    await expect(run(categoryService.deleteCategory("c-food"))).rejects.toThrow(/mặc định/);
+    await expectRejects(categoryService.deleteCategory("c-food"), /mặc định/);
   });
 
   it("xoá danh mục đang dùng: bắt chọn danh mục nhận, rồi chuyển hết giao dịch sang", async () => {
     const pet = await run(categoryService.createCategory({ name: "Mèo", type: "expense", icon: "PawPrint", color: "#A16207" }));
     db.transactions.push({ ...db.transactions[0], id: "t-cat-test", categoryId: pet.id, type: "expense" });
-    await expect(run(categoryService.deleteCategory(pet.id))).rejects.toThrow(/Chọn danh mục/);
-    await expect(run(categoryService.deleteCategory(pet.id, "c-salary"))).rejects.toThrow(/cùng loại/);
+    await expectRejects(categoryService.deleteCategory(pet.id), /Chọn danh mục/);
+    await expectRejects(categoryService.deleteCategory(pet.id, "c-salary"), /cùng loại/);
     const { moved } = await run(categoryService.deleteCategory(pet.id, "c-other"));
     expect(moved).toBe(1);
     expect(db.transactions.find((t) => t.id === "t-cat-test")!.categoryId).toBe("c-other");

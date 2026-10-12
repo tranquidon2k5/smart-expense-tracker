@@ -125,10 +125,6 @@ export async function listPendingTransactions(): Promise<TransactionView[]> {
 
 // ───────────── Luật từ khoá (F08) ─────────────
 
-function matchRule(text: string): ClassificationRule | undefined {
-  return db.classificationRules.find((r) => matchesKeyword(text, r.keyword));
-}
-
 function categoryOrThrow(categoryId: string): Category {
   const category = db.categories.find((c) => c.id === categoryId);
   if (!category) throw new Error("Danh mục không tồn tại.");
@@ -330,6 +326,45 @@ const KEYWORD_RULES: { keywords: string[]; categoryId: string }[] = [
   { keywords: ["thuoc", "kham", "gym", "nha khoa", "bao hiem", "pharmacity"], categoryId: "c-health" },
 ];
 
+/** Gợi ý của "LLM" giả lập khi không luật nào khớp: đoán được nhưng chưa chắc (< 0,7 → chờ duyệt) */
+const LLM_GUESSES: { keywords: string[]; categoryId: string; confidence: number }[] = [
+  { keywords: ["winmart", "bach hoa", "bhx", "coopmart", "co op", "circle k", "familymart", "gs25"], categoryId: "c-food", confidence: 0.62 },
+  { keywords: ["guardian", "long chau", "an khang", "benh vien"], categoryId: "c-health", confidence: 0.64 },
+  { keywords: ["vexere", "vietjet", "vietnam airlines", "agoda", "traveloka", "booking"], categoryId: "c-fun", confidence: 0.58 },
+  { keywords: ["dien may", "the gioi di dong", "fpt shop", "cellphones"], categoryId: "c-shop", confidence: 0.6 },
+];
+
+export interface ClassifyResult {
+  category: Category | null;
+  confidence: number;
+  /** rule: luật người dùng/mặc định khớp; llm: AI đoán; none: không đoán được */
+  source: "rule" | "llm" | "none";
+}
+
+/**
+ * Phân loại hybrid (F08, PRD §9.1 bước 4): luật người dùng → luật mặc định → "LLM" đoán.
+ * `type` (nếu biết, vd. từ dấu số tiền trong sao kê) loại bỏ danh mục khác loại thu/chi.
+ */
+export function classifyDescription(text: string, type?: TransactionType): ClassifyResult {
+  const norm = ` ${normalize(text).replace(/[^a-z0-9]+/g, " ")} `;
+  const fits = (categoryId: string) => {
+    const c = db.categories.find((x) => x.id === categoryId);
+    return c && (!type || c.type === type) ? c : null;
+  };
+  // Luật người dùng chạy trước luật mặc định (F08: hybrid, luật trước rồi mới tới LLM)
+  const userRule = db.classificationRules.find((r) => matchesKeyword(text, r.keyword) && fits(r.categoryId));
+  if (userRule) return { category: fits(userRule.categoryId), confidence: 0.97, source: "rule" };
+  for (const r of KEYWORD_RULES) {
+    const c = fits(r.categoryId);
+    if (c && r.keywords.some((k) => norm.includes(k))) return { category: c, confidence: 0.95, source: "rule" };
+  }
+  for (const g of LLM_GUESSES) {
+    const c = fits(g.categoryId);
+    if (c && g.keywords.some((k) => norm.includes(k))) return { category: c, confidence: g.confidence, source: "llm" };
+  }
+  return { category: null, confidence: 0.45, source: "none" };
+}
+
 const INCOME_HINTS = ["luong", "thuong", "nhan ", "duoc cho", "hoan tien", "ban do", "thu "];
 
 function addDays(isoDate: string, delta: number): string {
@@ -384,14 +419,9 @@ export async function parseQuickEntry(text: string): Promise<QuickEntryPreview> 
   const { amount, match: amountMatch } = parseAmount(text);
   const { date, match: dateMatch } = parseDate(text);
   const norm = ` ${normalize(text).replace(/[^a-z0-9]+/g, " ")} `;
-
-  // Luật người dùng chạy trước luật mặc định (F08: hybrid, luật trước rồi mới tới LLM)
-  const userRule = matchRule(text);
-  const rule = KEYWORD_RULES.find((r) => r.keywords.some((k) => norm.includes(k)));
   const inferredIncome = INCOME_HINTS.some((k) => norm.includes(k));
-  const categoryId = userRule?.categoryId ?? rule?.categoryId;
-  const category = categoryId ? db.categories.find((c) => c.id === categoryId)! : null;
-  const type: TransactionType = category?.type ?? (inferredIncome ? "income" : "expense");
+  const guess = classifyDescription(text);
+  const type: TransactionType = guess.category?.type ?? (inferredIncome ? "income" : "expense");
 
   const walletId = norm.includes("momo")
     ? "w-momo"
@@ -409,9 +439,8 @@ export async function parseQuickEntry(text: string): Promise<QuickEntryPreview> 
     type,
     date,
     description: cleanDescription(text, [amountMatch, dateMatch]) || text,
-    categoryId: category?.id ?? (type === "income" ? "c-income-other" : "c-other"),
-    // Khớp luật → tin cậy cao; không khớp → "LLM" đoán với độ tin cậy thấp
-    confidence: userRule ? 0.97 : rule ? 0.95 : 0.55,
+    categoryId: guess.category?.id ?? (type === "income" ? "c-income-other" : "c-other"),
+    confidence: guess.category ? guess.confidence : 0.55,
     walletId,
   };
 }

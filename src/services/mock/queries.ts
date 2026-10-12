@@ -1,5 +1,5 @@
 /** Truy vấn nội bộ trên mock db, có áp kịch bản (?demo=empty). Chỉ services dùng. */
-import type { Badge, Transaction, TransactionView, Wallet } from "@/types";
+import type { Badge, CategoryBreakdown, CategorySlice, MonthTotals, Transaction, TransactionView, Wallet } from "@/types";
 import { emitCelebrate } from "../events";
 import * as db from "./db";
 import { getScenario } from "./scenario";
@@ -20,6 +20,59 @@ export function toView(t: Transaction): TransactionView {
     category: db.categories.find((c) => c.id === t.categoryId)!,
     wallet: db.wallets.find((w) => w.id === t.walletId)!,
   };
+}
+
+// ───────────── Số liệu thống kê (dùng chung cho Tổng quan và Thống kê) ─────────────
+
+/** Chỉ tính giao dịch đã xác nhận; giao dịch chờ duyệt chưa vào thống kê */
+export function confirmedTransactions(): Transaction[] {
+  return scopedTransactions().filter((t) => t.status === "confirmed");
+}
+
+export function sumTotals(list: readonly Transaction[]): MonthTotals {
+  return list.reduce(
+    (acc, t) => {
+      acc[t.type] += t.amount;
+      return acc;
+    },
+    { income: 0, expense: 0 },
+  );
+}
+
+/** "2026-10", -1 → "2026-09" */
+export function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return d.toISOString().slice(0, 7);
+}
+
+/** Danh sách tháng từ `from` tới `to` (tính cả hai đầu) */
+export function monthsBetween(from: string, to: string): string[] {
+  const out: string[] = [];
+  for (let m = from; m <= to && out.length < 120; m = shiftMonth(m, 1)) out.push(m);
+  return out;
+}
+
+export const OTHER_COLOR = "#64748B";
+
+/** Cơ cấu chi theo danh mục: tối đa `maxSlices` lát, quá thì gộp phần đuôi vào "Khác" (MASTER.md › Charts) */
+export function buildBreakdown(expenses: readonly Transaction[], month: string, maxSlices = 5): CategoryBreakdown {
+  const byCategory = new Map<string, number>();
+  for (const t of expenses) byCategory.set(t.categoryId, (byCategory.get(t.categoryId) ?? 0) + t.amount);
+
+  const total = expenses.reduce((s, t) => s + t.amount, 0);
+  const sorted = [...byCategory.entries()].sort((a, b) => b[1] - a[1]);
+  const head = sorted.length > maxSlices ? sorted.slice(0, maxSlices - 1) : sorted;
+  const restAmount = sorted.slice(head.length).reduce((s, [, v]) => s + v, 0);
+
+  const slices: CategorySlice[] = head.map(([id, amount]) => {
+    const c = db.categories.find((x) => x.id === id)!;
+    return { categoryId: id, name: c.name, color: c.color, amount, percent: (amount / total) * 100 };
+  });
+  if (restAmount > 0) {
+    slices.push({ categoryId: null, name: "Khác", color: OTHER_COLOR, amount: restAmount, percent: (restAmount / total) * 100 });
+  }
+  return { month, total, slices };
 }
 
 /** Ảnh hưởng của một giao dịch lên số dư ví (thu +, chi −) */
