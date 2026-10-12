@@ -4,6 +4,7 @@ import * as React from "react";
 import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { QuickAddProvider, useQuickAdd } from "@/components/quick-add/quick-add-provider";
 import { QuickAddDialog } from "@/components/quick-add/quick-add";
+import { AuthGate } from "@/components/auth/auth-gate";
 import { CelebrationHost } from "@/components/celebration";
 import { AppSidebar } from "./app-sidebar";
 import { BottomNav } from "./bottom-nav";
@@ -80,6 +81,10 @@ function ShellBody({ children }: { children: React.ReactNode }) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  return <AuthGate>{() => <AppShellInner>{children}</AppShellInner>}</AuthGate>;
+}
+
+function AppShellInner({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <a

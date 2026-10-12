@@ -2,6 +2,7 @@ import type { AskResult, ChatMessageView, Conversation, ConversationSummary, Tra
 import { answerQuestion, type EngineContext, SUGGESTED_QUESTIONS } from "./assistant-engine";
 import * as db from "./mock/db";
 import { bumpMission, evaluateBadges, scopedTransactions, toView } from "./mock/queries";
+import { dataset } from "./mock/dataset";
 import { failIfErrorScenario, getScenario, simulateLatency } from "./mock/scenario";
 import { emitDataChanged } from "./events";
 
@@ -41,8 +42,15 @@ function exchange(question: string, at: string): ChatMessageView[] {
 
 /** Lịch sử hội thoại (chat_messages). Câu trả lời mẫu cũng được tính từ dữ liệu thật. */
 let conversations: Conversation[] | null = null;
+let conversationsVersion = -1;
 function store(): Conversation[] {
   if (getScenario() === "empty") return [];
+  if (conversationsVersion !== dataset.version) {
+    conversations = null;
+    conversationsVersion = dataset.version;
+  }
+  // Hội thoại mẫu chỉ có ở sổ của Lan; tài khoản khác bắt đầu với lịch sử trống
+  if (!conversations && dataset.ownerId !== db.USER_ID) conversations = [];
   if (!conversations) {
     const at1 = "2026-10-11T21:05:00+07:00";
     const at2 = "2026-10-05T12:20:00+07:00";

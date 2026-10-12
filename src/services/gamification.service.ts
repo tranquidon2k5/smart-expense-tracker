@@ -55,7 +55,7 @@ async function statusNow(): Promise<GamificationStatus> {
 function missionsOf(period: MissionPeriod): MissionProgress[] {
   const empty = getScenario() === "empty";
   return db.missions
-    .filter((m) => m.period === period)
+    .filter((m) => m.period === period && m.isActive !== false)
     .map((mission) => {
       const um = db.userMissions.find((x) => x.missionId === mission.id);
       const progress = empty ? 0 : (um?.progress ?? 0);
@@ -122,10 +122,14 @@ export async function getMotivation(): Promise<string> {
     : db.session.activeToday
       ? "after_transaction"
       : "morning";
-  const template = db.motivationMessages.find((m) => m.context === context && m.isActive)!.template;
+  // Luân phiên các câu đang bật theo ngày (PRD §6.3: ưu tiên câu chưa hiện gần đây để tránh lặp)
+  const pool = db.motivationMessages.filter((m) => m.context === context && m.isActive);
+  const dayIndex = Math.floor(Date.parse(`${db.MOCK_TODAY}T00:00:00Z`) / 86_400_000);
+  const template = pool.length ? pool[dayIndex % pool.length].template : "Mỗi khoản bạn ghi là một bước hiểu túi tiền của mình hơn.";
   const firstName = db.user.fullName.split(" ").at(-1) ?? "";
   return template
-    .replace("{name}", firstName)
-    .replace("{streak}", String(db.streak.currentStreak))
-    .replace("{longest}", String(db.streak.longestStreak));
+    .replaceAll("{name}", firstName)
+    .replaceAll("{streak}", String(db.streak.currentStreak))
+    .replaceAll("{longest}", String(db.streak.longestStreak))
+    .replaceAll("{amount}", "");
 }

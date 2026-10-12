@@ -52,12 +52,18 @@ export function CategoryFormDialog({
   onOpenChange,
   editing,
   defaultType,
+  save,
+  scope = "user",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** null = tạo mới */
   editing: Category | null;
   defaultType: TransactionType;
+  /** Lưu theo cách khác (vd. admin lưu danh mục mặc định); bỏ trống = danh mục riêng của người dùng */
+  save?: (input: CategoryInput, id?: string) => Promise<void>;
+  /** "default": danh mục mặc định cho mọi người dùng (trang quản trị) */
+  scope?: "user" | "default";
 }) {
   const ids = React.useId();
   const [form, setForm] = React.useState<CategoryInput>(() => initial(editing, defaultType));
@@ -81,12 +87,15 @@ export function CategoryFormDialog({
   const colorProps = useRadioGrid(CATEGORY_COLORS, colorIndex, (i) => setForm((f) => ({ ...f, color: CATEGORY_COLORS[i].value })), 8);
 
   const submit = async () => {
-    const v = categoryService.validateCategory(form, editing?.id);
+    const v = save ? (form.name.trim().length < 2 ? "Tên danh mục cần ít nhất 2 ký tự." : null) : categoryService.validateCategory(form, editing?.id);
     if (v) return setError(v);
     setError(null);
     setSaving(true);
     try {
-      if (editing) {
+      if (save) {
+        await save(form, editing?.id);
+        toast.success(editing ? `Đã lưu danh mục “${form.name.trim()}”` : `Đã thêm danh mục mặc định “${form.name.trim()}”`);
+      } else if (editing) {
         await categoryService.updateCategory(editing.id, { name: form.name, icon: form.icon, color: form.color });
         toast.success(`Đã lưu danh mục “${form.name.trim()}”`);
       } else {
@@ -107,11 +116,16 @@ export function CategoryFormDialog({
     <Dialog open={open} onOpenChange={(o) => !saving && onOpenChange(o)}>
       <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{editing ? "Sửa danh mục" : "Thêm danh mục"}</DialogTitle>
+          <DialogTitle>
+            {editing ? "Sửa danh mục" : "Thêm danh mục"}
+            {scope === "default" && " mặc định"}
+          </DialogTitle>
           <DialogDescription>
             {editing
               ? "Đổi tên, biểu tượng hoặc màu. Loại thu/chi giữ nguyên để không làm sai các giao dịch cũ."
-              : "Tạo danh mục riêng để phân loại chi tiêu theo cách của bạn."}
+              : scope === "default"
+                ? "Danh mục mặc định xuất hiện cho mọi người dùng, kể cả tài khoản đã có."
+                : "Tạo danh mục riêng để phân loại chi tiêu theo cách của bạn."}
           </DialogDescription>
         </DialogHeader>
 

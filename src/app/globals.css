@@ -241,3 +241,16 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Khu quản trị: mật độ "Gọn" của MASTER.md › Bảng dữ liệu (dòng 36px, chữ 13px).
+   Đặt ngoài @layer để thắng class tiện ích h-11/px-4 mặc định của Table. */
+.admin-dense [data-slot="table-head"] {
+  height: 2.25rem;
+  padding-inline: 0.75rem;
+  font-size: 12px;
+}
+.admin-dense [data-slot="table-cell"] {
+  height: 2.25rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 13px;
+}

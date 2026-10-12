@@ -14,3 +14,7 @@ export * as chatService from "./chat.service";
 export { onCelebrate, onDataChanged, type Celebration } from "./events";
 export * as importService from "./import.service";
 export * as statsService from "./stats.service";
+export * as authService from "./auth.service";
+export * as settingsService from "./settings.service";
+export * as notificationService from "./notification.service";
+export * as adminService from "./admin.service";

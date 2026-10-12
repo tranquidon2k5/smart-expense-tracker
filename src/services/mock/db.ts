@@ -5,6 +5,8 @@
  */
 import type {
   ActivityLog,
+  AppNotification,
+  ReminderSettings,
   Badge,
   ClassificationRule,
   WalletTransfer,
@@ -424,9 +426,48 @@ export const motivationMessages: MotivationMessage[] = [
   { id: "mm-7", context: "budget_good", template: "Tuần này bạn chi đúng kế hoạch, giỏi lắm!", isActive: true },
 ];
 
+/** Giờ nhắc mặc định 20:00 (PRD §6.3), người dùng tắt được hoàn toàn */
+export const reminderSettings: ReminderSettings = { enabled: true, time: "20:00", email: false };
+
+/** Thông báo trong app: nhắc nhở, chúc mừng, cảnh báo ngân sách (bảng notifications) */
+export const notifications: AppNotification[] = [
+  {
+    id: "nt-6", userId: USER_ID, type: "budget_alert", title: "Ngân sách Mua sắm đã dùng 87%",
+    content: "Bạn đã chi 958.000đ / 1.100.000đ cho Mua sắm tháng này. Còn 142.000đ cho 19 ngày tới.",
+    link: "/ngan-sach", isRead: false, createdAt: "2026-10-11T18:30:00+07:00",
+  },
+  {
+    id: "nt-5", userId: USER_ID, type: "reminder", title: "Giữ chuỗi 12 ngày nhé",
+    content: "Còn vài tiếng nữa là hết ngày. Ghi 1 khoản chi để giữ chuỗi 12 ngày nhé!",
+    link: "/", isRead: false, createdAt: "2026-10-10T20:00:00+07:00",
+  },
+  {
+    id: "nt-4", userId: USER_ID, type: "celebration", title: "Lên cấp 5!",
+    content: "Danh hiệu mới: Thủ quỹ chăm chỉ. Bạn đang làm rất tốt.",
+    link: "/thanh-tich", isRead: true, createdAt: "2026-10-09T21:40:00+07:00",
+  },
+  {
+    id: "nt-3", userId: USER_ID, type: "reminder", title: "Giữ chuỗi 9 ngày nhé",
+    content: "Còn vài tiếng nữa là hết ngày. Ghi 1 khoản chi để giữ chuỗi 9 ngày nhé!",
+    link: "/", isRead: true, createdAt: "2026-10-07T20:00:00+07:00",
+  },
+  {
+    id: "nt-2", userId: USER_ID, type: "celebration", title: "Chuỗi 7 ngày! +100 XP",
+    content: "Tuyệt vời! 7 ngày liên tiếp. Bạn nhận thêm 1 thẻ đóng băng để nghỉ một ngày mà không mất chuỗi.",
+    link: "/thanh-tich", isRead: true, createdAt: "2026-10-05T21:10:00+07:00",
+  },
+  {
+    id: "nt-1", userId: USER_ID, type: "celebration", title: "Mở khoá huy hiệu “Người lập kế hoạch”",
+    content: "Bạn đã đặt ngân sách đủ 3 danh mục.",
+    link: "/thanh-tich", isRead: true, createdAt: "2026-10-01T09:12:00+07:00",
+  },
+];
+
 /** Trạng thái phiên demo — thay đổi khi người dùng ghi giao dịch */
 export const session = {
   activeToday: false,
+  /** Lần cuối tạo nhắc nhở theo lịch (yyyy-MM-dd) để mỗi ngày chỉ nhắc một lần */
+  lastReminderDate: null as string | null,
   /** Tổng số câu đã hỏi trợ lý AI (huy hiệu "Trò chuyện cùng AI") */
   chatQuestions: 9,
   /** Số lần người dùng sửa danh mục AI đoán (huy hiệu "Thầy giáo của AI") */

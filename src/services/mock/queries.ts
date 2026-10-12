@@ -1,6 +1,6 @@
 /** Truy vấn nội bộ trên mock db, có áp kịch bản (?demo=empty). Chỉ services dùng. */
 import type { Badge, CategoryBreakdown, CategorySlice, MonthTotals, Transaction, TransactionView, Wallet } from "@/types";
-import { emitCelebrate } from "../events";
+import { emitCelebrate, type Celebration } from "../events";
 import * as db from "./db";
 import { getScenario } from "./scenario";
 
@@ -81,6 +81,36 @@ export function applyToWallet(t: Pick<Transaction, "walletId" | "type" | "amount
   if (wallet) wallet.balance += sign * (t.type === "income" ? t.amount : -t.amount);
 }
 
+// ───────────── Chúc mừng → thông báo trong app ─────────────
+
+/** Thời điểm hiện tại theo "hôm nay" của bộ dữ liệu demo + giờ thật (múi giờ +07:00) */
+export function nowIso(now: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${db.MOCK_TODAY}T${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}+07:00`;
+}
+
+const CELEBRATION_LINK: Record<Celebration["kind"], string> = {
+  streak: "/thanh-tich",
+  badge: "/thanh-tich",
+  level: "/thanh-tich",
+  mission: "/",
+};
+
+/** Báo chúc mừng cho giao diện và lưu vào trung tâm thông báo (bảng notifications) */
+export function celebrate(c: Celebration): void {
+  db.notifications.unshift({
+    id: `nt-${Date.now().toString(36)}-${db.notifications.length}`,
+    userId: db.user.id,
+    type: "celebration",
+    title: c.xp ? `${c.title} +${c.xp} XP` : c.title,
+    content: c.description,
+    link: CELEBRATION_LINK[c.kind],
+    isRead: false,
+    createdAt: nowIso(),
+  });
+  emitCelebrate(c);
+}
+
 // ───────────── XP & cấp độ ─────────────
 
 /** XP cần để lên cấp n = 100 × n (PRD §6.4) */
@@ -102,7 +132,7 @@ export function addBonusXp(amount: number): void {
   const after = levelFromXp(db.level.totalXp).level;
   db.level.level = after;
   if (after > before) {
-    emitCelebrate({
+    celebrate({
       kind: "level",
       title: `Lên cấp ${after}!`,
       description: `Danh hiệu mới: ${db.LEVEL_TITLES[after] ?? db.LEVEL_TITLES[10]}. Bạn đang làm rất tốt.`,
@@ -204,7 +234,7 @@ export function recordActivity(actionType: "add_transaction" | "review_transacti
   const xp = db.STREAK_MILESTONES[days];
   if (!xp) return { streakIncreased: true, milestone: null };
   addBonusXp(xp);
-  emitCelebrate({
+  celebrate({
     kind: "streak",
     title: `Chuỗi ${days} ngày!`,
     description: `Tuyệt vời! ${days} ngày liên tiếp, bạn đã có thói quen thật sự rồi.`,
@@ -223,7 +253,7 @@ export function bumpMission(missionId: string, by = 1): void {
   if (um.progress < mission.target) return;
   um.completedAt = new Date().toISOString();
   addBonusXp(mission.xp);
-  emitCelebrate({
+  celebrate({
     kind: "mission",
     title: "Hoàn thành nhiệm vụ",
     description: mission.title,
@@ -274,7 +304,7 @@ export function evaluateBadges(): Badge[] {
     if (!p || p.current < p.target) continue;
     db.userBadges.push({ userId: db.USER_ID, badgeId: badge.id, unlockedAt: new Date().toISOString() });
     unlocked.push(badge);
-    emitCelebrate({
+    celebrate({
       kind: "badge",
       title: `Mở khoá huy hiệu “${badge.name}”`,
       description: badge.condition,

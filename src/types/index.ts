@@ -149,6 +149,8 @@ export interface Mission {
   period: MissionPeriod;
   target: number;
   xp: number;
+  /** Admin tắt thì nhiệm vụ không giao cho người dùng nữa */
+  isActive?: boolean;
 }
 
 export interface UserMission {
@@ -198,7 +200,11 @@ export interface AppNotification {
   id: ID;
   userId: ID;
   type: NotificationType;
+  /** Dòng tiêu đề ngắn (giao diện); bảng notifications chỉ bắt buộc `content` */
+  title?: string;
   content: string;
+  /** Trang mở ra khi bấm thông báo */
+  link?: string;
   isRead: boolean;
   createdAt: ISODateTime;
 }
@@ -622,4 +628,94 @@ export interface MonthComparison {
   totalsB: MonthTotals;
   /** Chi theo danh mục của hai tháng, sắp theo tổng hai tháng giảm dần; tối đa 5 dòng + "Khác" */
   rows: CategoryComparisonRow[];
+}
+
+// ───────────── Tài khoản & cài đặt (F01, §6.3) ─────────────
+
+export interface AuthSession {
+  userId: ID;
+  role: UserRole;
+  email: string;
+  fullName: string;
+}
+
+export interface RegisterInput {
+  fullName: string;
+  email: string;
+  password: string;
+}
+
+export interface ReminderSettings {
+  /** Tắt = không tạo nhắc nhở nào (PRD §6.1 "không gây áp lực") */
+  enabled: boolean;
+  /** "HH:mm", mặc định "20:00" */
+  time: string;
+  /** Kênh tuỳ chọn ngoài thông báo trong app (bắt buộc) */
+  email: boolean;
+}
+
+export interface UserSettings {
+  profile: Pick<User, "fullName" | "email" | "currency" | "timezone" | "createdAt">;
+  reminder: ReminderSettings;
+}
+
+export interface DataExport {
+  exportedAt: ISODateTime;
+  user: User;
+  wallets: Wallet[];
+  categories: Category[];
+  transactions: Transaction[];
+  budgets: Budget[];
+  classificationRules: ClassificationRule[];
+  gamification: { streak: UserStreak; level: UserLevel; badges: UserBadge[] };
+  notifications: AppNotification[];
+}
+
+// ───────────── Quản trị (F15) ─────────────
+
+export interface AdminUserRow {
+  id: ID;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  isLocked: boolean;
+  createdAt: ISODateTime;
+  lastActiveDate: ISODate | null;
+  transactionCount: number;
+  currentStreak: number;
+  aiCalls: number;
+}
+
+export interface AdminCategoryRow extends Category {
+  /** Số giao dịch (mọi người dùng) đang dùng danh mục */
+  usage: number;
+}
+
+export interface AdminBadgeRow extends Badge {
+  unlockedUsers: number;
+}
+
+export interface SystemDailyPoint {
+  date: ISODate;
+  transactions: number;
+  aiCalls: number;
+  aiFailures: number;
+  activeUsers: number;
+}
+
+export interface SystemStats {
+  totalUsers: number;
+  newUsers30d: number;
+  activeUsers7d: number;
+  lockedUsers: number;
+  totalTransactions: number;
+  transactions30d: number;
+  aiCalls30d: number;
+  aiSuccessRate: number;
+  aiAvgLatencyMs: number;
+  aiByFeature: { feature: AiFeature; label: string; calls: number; failures: number }[];
+  /** Người dùng đang có chuỗi ≥ 1 / người dùng hoạt động trong 30 ngày */
+  streakRetention: number;
+  streakRetentionBase: number;
+  daily: SystemDailyPoint[];
 }
