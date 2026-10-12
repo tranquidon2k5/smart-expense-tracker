@@ -4,6 +4,7 @@ import * as React from "react";
 import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { QuickAddProvider, useQuickAdd } from "@/components/quick-add/quick-add-provider";
 import { QuickAddDialog } from "@/components/quick-add/quick-add";
+import { CelebrationHost } from "@/components/celebration";
 import { AppSidebar } from "./app-sidebar";
 import { BottomNav } from "./bottom-nav";
 import { SearchCommand } from "./search-command";
@@ -73,6 +74,7 @@ function ShellBody({ children }: { children: React.ReactNode }) {
       <BottomNav />
       <QuickAddDialog />
       <SearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
+      <CelebrationHost />
     </>
   );
 }

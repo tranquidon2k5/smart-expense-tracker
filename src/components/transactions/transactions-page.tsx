@@ -197,8 +197,10 @@ export function TransactionsPage() {
     if (!deleteIds) return;
     setDeleting(true);
     try {
-      const removed = await transactionService.deleteTransactions(deleteIds);
-      toast.success(`Đã xoá ${removed} giao dịch`);
+      const { removed, xpRemoved } = await transactionService.deleteTransactions(deleteIds);
+      toast.success(`Đã xoá ${removed} giao dịch`, {
+        description: xpRemoved ? `Trừ lại ${xpRemoved} XP đã cộng cho các giao dịch ghi hôm nay.` : undefined,
+      });
       if (openId && deleteIds.includes(openId)) closeTransaction();
       setDeleteIds(null);
     } catch (e) {

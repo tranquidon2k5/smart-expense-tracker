@@ -1,16 +1,29 @@
-import type { GamificationStatus, MissionProgress, MotivationContext, User } from "@/types";
+import type {
+  AchievementsOverview,
+  ActivityDay,
+  GamificationStatus,
+  MissionPeriod,
+  MissionProgress,
+  MotivationContext,
+  User,
+} from "@/types";
 import * as db from "./mock/db";
-import { getScenario, simulateLatency } from "./mock/scenario";
+import { badgeProgress, levelFromXp } from "./mock/queries";
+import { failIfErrorScenario, getScenario, simulateLatency } from "./mock/scenario";
 
-/** XP cần để lên cấp n = 100 × n (PRD §6.4) */
-function levelFromXp(totalXp: number) {
-  let level = 1;
-  let floor = 0;
-  while (totalXp >= floor + 100 * (level + 1)) {
-    floor += 100 * (level + 1);
-    level += 1;
-  }
-  return { level, xpInLevel: totalXp - floor, xpForNextLevel: 100 * (level + 1) };
+/** Số tuần hiển thị trên lịch nhiệt (≈ 6 tháng, khớp thời gian dùng app của bản demo) */
+export const HEATMAP_WEEKS = 26;
+
+function addDays(iso: string, delta: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
+}
+
+/** Thứ Hai của tuần chứa `iso` (lịch Việt Nam bắt đầu tuần từ thứ Hai) */
+function mondayOf(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 = CN
+  return addDays(iso, -((wd + 6) % 7));
 }
 
 export async function getCurrentUser(): Promise<User> {
@@ -20,6 +33,10 @@ export async function getCurrentUser(): Promise<User> {
 
 export async function getGamificationStatus(): Promise<GamificationStatus> {
   await simulateLatency(300);
+  return statusNow();
+}
+
+async function statusNow(): Promise<GamificationStatus> {
   const empty = getScenario() === "empty";
   const streak = empty
     ? { ...db.streak, currentStreak: 0, longestStreak: 0, lastActiveDate: null, freezeCount: 0 }
@@ -35,16 +52,65 @@ export async function getGamificationStatus(): Promise<GamificationStatus> {
   };
 }
 
-export async function getTodayMissions(): Promise<MissionProgress[]> {
-  await simulateLatency();
+function missionsOf(period: MissionPeriod): MissionProgress[] {
   const empty = getScenario() === "empty";
   return db.missions
-    .filter((m) => m.period === "daily")
+    .filter((m) => m.period === period)
     .map((mission) => {
       const um = db.userMissions.find((x) => x.missionId === mission.id);
       const progress = empty ? 0 : (um?.progress ?? 0);
       return { mission, progress, completed: progress >= mission.target };
     });
+}
+
+export async function getTodayMissions(): Promise<MissionProgress[]> {
+  await simulateLatency();
+  return missionsOf("daily");
+}
+
+/** Lịch nhiệt: mỗi ngày trong HEATMAP_WEEKS tuần gần nhất, tính tới hôm nay */
+function activityDays(): ActivityDay[] {
+  const empty = getScenario() === "empty";
+  const counts = new Map<string, number>();
+  if (!empty) for (const l of db.activityLogs) counts.set(l.date, (counts.get(l.date) ?? 0) + 1);
+  const frozen = new Set(empty ? [] : db.freezeDays);
+  const start = addDays(mondayOf(db.MOCK_TODAY), -(HEATMAP_WEEKS - 1) * 7);
+  const days: ActivityDay[] = [];
+  for (let d = start; d <= db.MOCK_TODAY; d = addDays(d, 1)) {
+    days.push({ date: d, count: counts.get(d) ?? 0, frozen: frozen.has(d) });
+  }
+  return days;
+}
+
+/** Toàn bộ trang Thành tích: chuỗi, cấp độ, lịch nhiệt, nhiệm vụ, huy hiệu (F11–F14) */
+export async function getAchievements(): Promise<AchievementsOverview> {
+  await simulateLatency(450);
+  failIfErrorScenario();
+  const status = await statusNow();
+  const empty = getScenario() === "empty";
+  const nextDays = Object.keys(db.STREAK_MILESTONES)
+    .map(Number)
+    .find((d) => d > status.streak.currentStreak);
+  return {
+    status,
+    nextMilestone: nextDays
+      ? { days: nextDays, xp: db.STREAK_MILESTONES[nextDays], remaining: nextDays - status.streak.currentStreak }
+      : null,
+    nextLevelTitle: db.LEVEL_TITLES[status.level + 1] ?? db.LEVEL_TITLES[10],
+    totalXp: empty ? 0 : db.level.totalXp,
+    days: activityDays(),
+    dailyMissions: missionsOf("daily"),
+    weeklyMissions: missionsOf("weekly"),
+    badges: db.badges.map((badge) => {
+      const ub = empty ? undefined : db.userBadges.find((x) => x.badgeId === badge.id);
+      const p = badgeProgress(badge);
+      return {
+        badge,
+        unlockedAt: ub?.unlockedAt ?? null,
+        progress: p && empty ? { current: 0, target: p.target } : p,
+      };
+    }),
+  };
 }
 
 /** Chọn câu khích lệ theo ngữ cảnh và chèn biến (PRD §6.3) */

@@ -334,6 +334,12 @@ export interface RuleSuggestion {
   matchingPendingCount: number;
 }
 
+export interface DeleteResult {
+  removed: number;
+  /** XP đã trừ lại vì giao dịch được ghi trong hôm nay (PRD §13.1) */
+  xpRemoved: number;
+}
+
 export interface UpdateResult {
   transaction: TransactionView;
   ruleSuggestion: RuleSuggestion | null;
@@ -432,6 +438,78 @@ export interface CategoryInput {
   type: TransactionType;
   icon: string;
   color: string;
+}
+
+// ───────────── Trợ lý AI (F10, Luồng 3) ─────────────
+
+/** Một lần "LLM" gọi công cụ truy vấn dữ liệu (function calling) */
+export interface ChatToolCall {
+  name: string;
+  args: Record<string, string | number | null>;
+}
+
+export interface ChatMessageView {
+  id: ID;
+  role: "user" | "assistant";
+  content: string;
+  /** Công cụ đã gọi để lấy số liệu — rỗng với câu hỏi người dùng / câu từ chối */
+  toolCalls: ChatToolCall[];
+  /** Giao dịch nguồn làm căn cứ cho câu trả lời */
+  sourceIds: ID[];
+  /** Câu hỏi ngoài phạm vi → trợ lý từ chối nhẹ nhàng */
+  refused: boolean;
+  createdAt: ISODateTime;
+}
+
+export interface Conversation {
+  id: ID;
+  title: string;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+  messages: ChatMessageView[];
+}
+
+export interface ConversationSummary {
+  id: ID;
+  title: string;
+  updatedAt: ISODateTime;
+  questionCount: number;
+}
+
+export interface AskResult {
+  conversation: Conversation;
+  userMessage: ChatMessageView;
+  assistantMessage: ChatMessageView;
+}
+
+// ───────────── Thành tích (F11–F14) ─────────────
+
+export interface ActivityDay {
+  date: ISODate;
+  /** Số lần ghi chép / duyệt trong ngày */
+  count: number;
+  /** Ngày dùng thẻ đóng băng */
+  frozen: boolean;
+}
+
+export interface BadgeView {
+  badge: Badge;
+  unlockedAt: ISODateTime | null;
+  /** null khi huy hiệu không đo được tiến độ giữa chừng */
+  progress: { current: number; target: number } | null;
+}
+
+export interface AchievementsOverview {
+  status: GamificationStatus;
+  /** Mốc chuỗi kế tiếp và số ngày còn thiếu */
+  nextMilestone: { days: number; xp: number; remaining: number } | null;
+  /** Danh hiệu ở cấp kế tiếp */
+  nextLevelTitle: string;
+  totalXp: number;
+  days: ActivityDay[];
+  dailyMissions: MissionProgress[];
+  weeklyMissions: MissionProgress[];
+  badges: BadgeView[];
 }
 
 export interface CreateRuleResult {

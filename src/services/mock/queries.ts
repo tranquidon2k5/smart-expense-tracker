@@ -1,5 +1,6 @@
 /** Truy vấn nội bộ trên mock db, có áp kịch bản (?demo=empty). Chỉ services dùng. */
-import type { Transaction, TransactionView, Wallet } from "@/types";
+import type { Badge, Transaction, TransactionView, Wallet } from "@/types";
+import { emitCelebrate } from "../events";
 import * as db from "./db";
 import { getScenario } from "./scenario";
 
@@ -27,6 +28,36 @@ export function applyToWallet(t: Pick<Transaction, "walletId" | "type" | "amount
   if (wallet) wallet.balance += sign * (t.type === "income" ? t.amount : -t.amount);
 }
 
+// ───────────── XP & cấp độ ─────────────
+
+/** XP cần để lên cấp n = 100 × n (PRD §6.4) */
+export function levelFromXp(totalXp: number) {
+  let level = 1;
+  let floor = 0;
+  while (totalXp >= floor + 100 * (level + 1)) {
+    floor += 100 * (level + 1);
+    level += 1;
+  }
+  return { level, xpInLevel: totalXp - floor, xpForNextLevel: 100 * (level + 1) };
+}
+
+/** Cộng XP thô (thưởng mốc chuỗi, nhiệm vụ…) và chúc mừng nếu lên cấp */
+export function addBonusXp(amount: number): void {
+  if (amount <= 0) return;
+  const before = levelFromXp(db.level.totalXp).level;
+  db.level.totalXp += amount;
+  const after = levelFromXp(db.level.totalXp).level;
+  db.level.level = after;
+  if (after > before) {
+    emitCelebrate({
+      kind: "level",
+      title: `Lên cấp ${after}!`,
+      description: `Danh hiệu mới: ${db.LEVEL_TITLES[after] ?? db.LEVEL_TITLES[10]}. Bạn đang làm rất tốt.`,
+      icon: "Star",
+    });
+  }
+}
+
 /** Bảng điểm XP có giới hạn theo ngày (PRD §6.4) */
 export const XP_RULES = {
   add_transaction: { xp: 10, dailyLimit: 10 },
@@ -42,45 +73,162 @@ export interface XpAward {
   countToday: number;
 }
 
-/**
- * Cộng XP cho một hành động, tối đa `dailyLimit` lần/ngày mỗi loại (chống spam).
- * Bộ đếm reset khi sang ngày mới theo múi giờ người dùng.
- */
-export function awardXp(action: XpAction, today: string = db.MOCK_TODAY): XpAward {
+function syncXpDay(today: string) {
   const counts = db.session.xpCounts;
   if (counts.date !== today) {
     counts.date = today;
     counts.add_transaction = 0;
     counts.review = 0;
   }
+  return counts;
+}
+
+/**
+ * Cộng XP cho một hành động, tối đa `dailyLimit` lần/ngày mỗi loại (chống spam).
+ * Bộ đếm reset khi sang ngày mới theo múi giờ người dùng.
+ */
+export function awardXp(action: XpAction, today: string = db.MOCK_TODAY): XpAward {
+  const counts = syncXpDay(today);
   const rule = XP_RULES[action];
   if (counts[action] >= rule.dailyLimit) {
     return { xp: 0, limitReached: true, countToday: counts[action] };
   }
   counts[action] += 1;
-  db.level.totalXp += rule.xp;
+  addBonusXp(rule.xp);
   return { xp: rule.xp, limitReached: false, countToday: counts[action] };
+}
+
+/** Ghi lại XP đã cộng cho một giao dịch mới (để trừ lại nếu xoá trong ngày) */
+export function rememberTransactionXp(transactionId: string, xp: number, today: string = db.MOCK_TODAY): void {
+  if (xp > 0) db.session.xpAwards[transactionId] = { xp, date: today };
+}
+
+/**
+ * Xoá giao dịch trong cùng ngày đã ghi → trừ lại đúng XP đã cộng cho nó (PRD §13.1),
+ * không để tổng XP âm, và trả lại một lượt trong giới hạn 10 lần/ngày.
+ * Giao dịch ghi từ hôm trước, hoặc không được cộng XP, thì không trừ.
+ * Trả về số XP thực sự đã trừ.
+ */
+export function revokeTransactionXp(transactionId: string, today: string = db.MOCK_TODAY): number {
+  const award = db.session.xpAwards[transactionId];
+  if (!award) return 0;
+  delete db.session.xpAwards[transactionId];
+  if (award.date !== today) return 0;
+  const removed = Math.min(award.xp, db.level.totalXp);
+  db.level.totalXp -= removed;
+  db.level.level = levelFromXp(db.level.totalXp).level;
+  const counts = syncXpDay(today);
+  counts.add_transaction = Math.max(0, counts.add_transaction - 1);
+  return removed;
+}
+
+// ───────────── Chuỗi ngày & nhiệm vụ ─────────────
+
+export interface ActivityResult {
+  /** Hành động đầu tiên trong ngày → chuỗi vừa tăng */
+  streakIncreased: boolean;
+  /** Vừa chạm mốc chuỗi (3, 7, 14, 30, 60, 100) */
+  milestone: { days: number; xp: number } | null;
 }
 
 /**
  * Ghi nhận hành động hợp lệ cho chuỗi ngày (PRD §6.2: thêm giao dịch, duyệt giao dịch chờ…).
- * Trả về true nếu đây là hành động đầu tiên trong ngày (chuỗi vừa tăng).
+ * Lần đầu trong ngày: chuỗi +1, mỗi 7 ngày nhận 1 thẻ đóng băng (tối đa 2), chạm mốc thì
+ * cộng XP thưởng và chúc mừng.
  */
-export function recordActivity(): boolean {
-  if (db.session.activeToday) return false;
+export function recordActivity(actionType: "add_transaction" | "review_transaction" = "add_transaction"): ActivityResult {
+  db.activityLogs.push({ id: `al-${Date.now()}-${db.activityLogs.length}`, userId: db.USER_ID, date: db.MOCK_TODAY, actionType });
+  if (db.session.activeToday) return { streakIncreased: false, milestone: null };
+
   db.session.activeToday = true;
   db.streak.currentStreak += 1;
   db.streak.lastActiveDate = db.MOCK_TODAY;
   db.streak.longestStreak = Math.max(db.streak.longestStreak, db.streak.currentStreak);
-  return true;
+  if (db.streak.currentStreak % 7 === 0 && db.streak.freezeCount < 2) db.streak.freezeCount += 1;
+  bumpMission("m-w-5days");
+
+  const days = db.streak.currentStreak;
+  const xp = db.STREAK_MILESTONES[days];
+  if (!xp) return { streakIncreased: true, milestone: null };
+  addBonusXp(xp);
+  emitCelebrate({
+    kind: "streak",
+    title: `Chuỗi ${days} ngày!`,
+    description: `Tuyệt vời! ${days} ngày liên tiếp, bạn đã có thói quen thật sự rồi.`,
+    icon: "Flame",
+    xp,
+  });
+  return { streakIncreased: true, milestone: { days, xp } };
 }
 
+/** Tăng tiến độ nhiệm vụ; hoàn thành thì cộng XP nhiệm vụ và báo chúc mừng nhẹ */
 export function bumpMission(missionId: string, by = 1): void {
   const um = db.userMissions.find((m) => m.missionId === missionId);
   const mission = db.missions.find((m) => m.id === missionId);
   if (!um || !mission || um.progress >= mission.target) return;
   um.progress = Math.min(mission.target, um.progress + by);
-  if (um.progress === mission.target) um.completedAt = new Date().toISOString();
+  if (um.progress < mission.target) return;
+  um.completedAt = new Date().toISOString();
+  addBonusXp(mission.xp);
+  emitCelebrate({
+    kind: "mission",
+    title: "Hoàn thành nhiệm vụ",
+    description: mission.title,
+    icon: "ListChecks",
+    xp: mission.xp,
+  });
+}
+
+// ───────────── Huy hiệu (F14) ─────────────
+
+export interface BadgeProgress {
+  current: number;
+  target: number;
+}
+
+/** Tiến độ hướng tới từng huy hiệu, tính từ dữ liệu thật */
+export function badgeProgress(badge: Badge): BadgeProgress | null {
+  const month = db.MOCK_TODAY.slice(0, 7);
+  switch (badge.code) {
+    case "FIRST_STEP":
+      return { current: Math.min(1, db.transactions.length), target: 1 };
+    case "FIRE_7":
+      return { current: Math.min(7, db.streak.longestStreak), target: 7 };
+    case "FIRE_30":
+      return { current: Math.min(30, db.streak.longestStreak), target: 30 };
+    case "FIRE_100":
+      return { current: Math.min(100, db.streak.longestStreak), target: 100 };
+    case "CHAT_10":
+      return { current: Math.min(10, db.session.chatQuestions), target: 10 };
+    case "PLANNER":
+      return { current: Math.min(3, db.budgets.filter((b) => b.month === month).length), target: 3 };
+    case "COLLECTOR":
+      return { current: Math.min(100, db.transactions.length), target: 100 };
+    case "AI_TEACHER":
+      return { current: Math.min(20, db.session.corrections), target: 20 };
+    default:
+      // "Giữ đúng lời hứa" chỉ xét được khi hết tháng
+      return null;
+  }
+}
+
+/** Mở các huy hiệu vừa đạt điều kiện; mỗi huy hiệu mới được chúc mừng một lần */
+export function evaluateBadges(): Badge[] {
+  const unlocked: Badge[] = [];
+  for (const badge of db.badges) {
+    if (db.userBadges.some((ub) => ub.badgeId === badge.id)) continue;
+    const p = badgeProgress(badge);
+    if (!p || p.current < p.target) continue;
+    db.userBadges.push({ userId: db.USER_ID, badgeId: badge.id, unlockedAt: new Date().toISOString() });
+    unlocked.push(badge);
+    emitCelebrate({
+      kind: "badge",
+      title: `Mở khoá huy hiệu “${badge.name}”`,
+      description: badge.condition,
+      icon: badge.icon,
+    });
+  }
+  return unlocked;
 }
 
 export { normalize } from "@/lib/text";

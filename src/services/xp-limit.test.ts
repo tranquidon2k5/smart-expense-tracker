@@ -39,8 +39,17 @@ function addPending(i: number): Transaction {
   return t;
 }
 
+/**
+ * Cô lập XP theo hành động: đánh dấu hôm nay đã ghi chép (không còn thưởng mốc chuỗi)
+ * và mọi nhiệm vụ đã xong (không còn thưởng nhiệm vụ) — các khoản thưởng đó được test riêng.
+ */
 function resetXpCounters() {
   db.session.xpCounts = { date: db.MOCK_TODAY, add_transaction: 0, review: 0 };
+  db.session.activeToday = true;
+  for (const um of db.userMissions) {
+    const mission = db.missions.find((m) => m.id === um.missionId)!;
+    um.progress = mission.target;
+  }
 }
 
 describe("Giới hạn XP theo ngày (PRD §6.4)", () => {

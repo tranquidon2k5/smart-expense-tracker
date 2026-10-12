@@ -24,7 +24,7 @@ export const NAV_MAIN: NavItem[] = [
   { href: "/ngan-sach", label: "Ngân sách", icon: PiggyBank, keywords: "han muc budget" },
   { href: "/vi", label: "Ví", icon: Wallet, keywords: "tai khoan ngan hang momo tien mat chuyen tien" },
   { href: "/danh-muc", label: "Danh mục", icon: Shapes, keywords: "phan loai thu chi icon mau" },
-  { href: "/tro-ly", label: "Trợ lý AI", icon: MessageCircle, keywords: "chatbot hoi dap" },
+  { href: "/tro-ly-ai", label: "Trợ lý AI", icon: MessageCircle, keywords: "chatbot hoi dap" },
   { href: "/thanh-tich", label: "Thành tích", icon: Trophy, keywords: "chuoi huy hieu xp cap do" },
 ];
 

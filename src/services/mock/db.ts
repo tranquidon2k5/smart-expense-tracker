@@ -4,6 +4,7 @@
  * Dữ liệu sinh tất định (seed cố định) để mỗi lần tải trang giống nhau.
  */
 import type {
+  ActivityLog,
   Badge,
   ClassificationRule,
   WalletTransfer,
@@ -272,11 +273,84 @@ export const budgets: Budget[] = [
 
 // ───────────── Gamification ─────────────
 
+function addDaysIso(iso: string, delta: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
+}
+
+/** Ngày bắt đầu dùng app */
+export const FIRST_DAY = "2026-04-28";
+
+/**
+ * Nhật ký hoạt động (activity_logs) — nguồn tính chuỗi ngày và lịch nhiệt.
+ * Kịch bản demo (tất định):
+ * - 03/08 → 17/08: chuỗi 15 ngày (kỷ lục)
+ * - 28/09 → 11/10: chuỗi đang chạy 13 ngày, có 04/10 dùng thẻ đóng băng
+ *   → hôm nay (12/10) ghi chép là chạm mốc 14 ngày
+ * - Còn lại: khoảng 3/4 số ngày có ghi chép, không chuỗi nào dài quá 9 ngày
+ */
+function buildActivity() {
+  const r = mulberry32(4242);
+  const logs: ActivityLog[] = [];
+  const frozen: string[] = ["2026-10-04"];
+  const forcedOn = (d: string) => (d >= "2026-08-03" && d <= "2026-08-17") || (d >= "2026-09-28" && d <= "2026-10-11");
+  const forcedOff = new Set(["2026-08-02", "2026-08-18", "2026-09-27"]);
+  let run = 0;
+  let seq = 0;
+  for (let d = FIRST_DAY; d < MOCK_TODAY; d = addDaysIso(d, 1)) {
+    let active: boolean;
+    if (frozen.includes(d)) active = false;
+    else if (forcedOn(d)) active = true;
+    else if (forcedOff.has(d) || run >= 9) active = false;
+    else active = d === FIRST_DAY || r() < 0.78;
+    run = active || frozen.includes(d) ? run + (active ? 1 : 0) : 0;
+    if (forcedOn(d) && !active) continue;
+    if (!active) continue;
+    const actions = 1 + Math.floor(r() * 6);
+    for (let i = 0; i < actions; i++) {
+      logs.push({
+        id: `al-${++seq}`,
+        userId: USER_ID,
+        date: d,
+        actionType: r() < 0.85 ? "add_transaction" : "review_transaction",
+      });
+    }
+  }
+  return { logs, frozen };
+}
+
+const activity = buildActivity();
+export const activityLogs: ActivityLog[] = activity.logs;
+/** Ngày đã dùng thẻ đóng băng (giữ chuỗi, không tính là ngày ghi chép) */
+export const freezeDays: string[] = activity.frozen;
+
+/**
+ * Tính chuỗi hiện tại và kỷ lục từ nhật ký: ngày có hoạt động +1, ngày đóng băng giữ nguyên,
+ * ngày trống làm chuỗi về 0. Chuỗi hiện tại tính đến `until` (hôm qua nếu hôm nay chưa ghi).
+ */
+export function computeStreaks(activeDates: Set<string>, frozenDates: Set<string>, from: string, until: string) {
+  let current = 0;
+  let longest = 0;
+  for (let d = from; d <= until; d = addDaysIso(d, 1)) {
+    if (activeDates.has(d)) current += 1;
+    else if (!frozenDates.has(d)) current = 0;
+    longest = Math.max(longest, current);
+  }
+  return { current, longest };
+}
+
+const initialStreaks = computeStreaks(
+  new Set(activityLogs.map((l) => l.date)),
+  new Set(freezeDays),
+  FIRST_DAY,
+  addDaysIso(MOCK_TODAY, -1),
+);
+
 export const streak: UserStreak = {
   userId: USER_ID,
-  currentStreak: 12,
-  longestStreak: 15,
-  lastActiveDate: "2026-10-11",
+  currentStreak: initialStreaks.current,
+  longestStreak: initialStreaks.longest,
+  lastActiveDate: addDaysIso(MOCK_TODAY, -1),
   freezeCount: 1,
 };
 
@@ -296,30 +370,45 @@ export const LEVEL_TITLES: Record<number, string> = {
   10: "Bậc thầy chi tiêu",
 };
 
+/** Mốc chuỗi → XP thưởng (PRD §6.2, §6.4) */
+export const STREAK_MILESTONES: Record<number, number> = { 3: 50, 7: 100, 14: 150, 30: 300, 60: 400, 100: 500 };
+
 export const missions: Mission[] = [
   { id: "m-d-3tx", code: "DAILY_3_TX", title: "Ghi ít nhất 3 giao dịch", period: "daily", target: 3, xp: 20 },
   { id: "m-d-chat", code: "DAILY_ASK_CHAT", title: "Hỏi trợ lý AI 1 câu", period: "daily", target: 1, xp: 20 },
   { id: "m-d-review", code: "DAILY_REVIEW_ALL", title: "Duyệt hết giao dịch chờ", period: "daily", target: 8, xp: 20 },
   { id: "m-w-5days", code: "WEEKLY_5_DAYS", title: "Ghi chép đủ 5/7 ngày", period: "weekly", target: 5, xp: 100 },
+  { id: "m-w-review10", code: "WEEKLY_REVIEW_10", title: "Duyệt 10 giao dịch AI chờ xác nhận", period: "weekly", target: 10, xp: 100 },
 ];
+
+/** Tuần ISO chứa ngày demo (12/10/2026 là thứ Hai → tuần mới bắt đầu hôm nay) */
+export const CURRENT_WEEK = "2026-W42";
 
 export const userMissions: UserMission[] = [
   { userId: USER_ID, missionId: "m-d-3tx", periodKey: MOCK_TODAY, progress: 0, completedAt: null },
-  { userId: USER_ID, missionId: "m-d-chat", periodKey: MOCK_TODAY, progress: 1, completedAt: "2026-10-12T07:42:00+07:00" },
+  { userId: USER_ID, missionId: "m-d-chat", periodKey: MOCK_TODAY, progress: 0, completedAt: null },
   { userId: USER_ID, missionId: "m-d-review", periodKey: MOCK_TODAY, progress: 0, completedAt: null },
-  { userId: USER_ID, missionId: "m-w-5days", periodKey: "2026-W42", progress: 0, completedAt: null },
+  { userId: USER_ID, missionId: "m-w-5days", periodKey: CURRENT_WEEK, progress: 0, completedAt: null },
+  { userId: USER_ID, missionId: "m-w-review10", periodKey: CURRENT_WEEK, progress: 0, completedAt: null },
 ];
 
+// Huy hiệu (PRD §6.5)
 export const badges: Badge[] = [
   { id: "bd-first", code: "FIRST_STEP", name: "Bước đầu tiên", icon: "Footprints", condition: "Ghi giao dịch đầu tiên" },
-  { id: "bd-fire7", code: "FIRE_7", name: "Lửa nhỏ", icon: "Flame", condition: "Chuỗi 7 ngày" },
-  { id: "bd-fire30", code: "FIRE_30", name: "Lửa bền", icon: "Flame", condition: "Chuỗi 30 ngày" },
+  { id: "bd-fire7", code: "FIRE_7", name: "Lửa nhỏ", icon: "Flame", condition: "Giữ chuỗi 7 ngày liên tiếp" },
+  { id: "bd-fire30", code: "FIRE_30", name: "Lửa bền", icon: "Flame", condition: "Giữ chuỗi 30 ngày liên tiếp" },
+  { id: "bd-fire100", code: "FIRE_100", name: "Lửa bất diệt", icon: "Flame", condition: "Giữ chuỗi 100 ngày liên tiếp" },
+  { id: "bd-chat10", code: "CHAT_10", name: "Trò chuyện cùng AI", icon: "MessageCircle", condition: "Hỏi trợ lý AI 10 câu" },
   { id: "bd-planner", code: "PLANNER", name: "Người lập kế hoạch", icon: "PiggyBank", condition: "Đặt ngân sách đủ 3 danh mục" },
+  { id: "bd-promise", code: "KEEP_PROMISE", name: "Giữ đúng lời hứa", icon: "ShieldCheck", condition: "Cả tháng không danh mục nào vượt ngân sách" },
+  { id: "bd-collector", code: "COLLECTOR", name: "Nhà sưu tầm", icon: "Archive", condition: "Ghi đủ 100 giao dịch" },
+  { id: "bd-teacher", code: "AI_TEACHER", name: "Thầy giáo của AI", icon: "GraduationCap", condition: "Sửa phân loại của AI 20 lần" },
 ];
 
 export const userBadges: UserBadge[] = [
   { userId: USER_ID, badgeId: "bd-first", unlockedAt: "2026-04-28T21:20:00+07:00" },
-  { userId: USER_ID, badgeId: "bd-fire7", unlockedAt: "2026-10-07T20:05:00+07:00" },
+  { userId: USER_ID, badgeId: "bd-fire7", unlockedAt: "2026-05-06T21:05:00+07:00" },
+  { userId: USER_ID, badgeId: "bd-collector", unlockedAt: "2026-05-24T22:10:00+07:00" },
   { userId: USER_ID, badgeId: "bd-planner", unlockedAt: "2026-10-01T09:12:00+07:00" },
 ];
 
@@ -338,6 +427,15 @@ export const motivationMessages: MotivationMessage[] = [
 /** Trạng thái phiên demo — thay đổi khi người dùng ghi giao dịch */
 export const session = {
   activeToday: false,
+  /** Tổng số câu đã hỏi trợ lý AI (huy hiệu "Trò chuyện cùng AI") */
+  chatQuestions: 9,
+  /** Số lần người dùng sửa danh mục AI đoán (huy hiệu "Thầy giáo của AI") */
+  corrections: 14,
+  /**
+   * XP đã cộng cho từng giao dịch ghi mới, kèm ngày cộng — để xoá trong ngày thì
+   * trừ lại đúng số đó (PRD §13.1).
+   */
+  xpAwards: {} as Record<string, { xp: number; date: string }>,
   /** Số lần đã nhận XP trong ngày theo từng loại hành động (giới hạn PRD §6.4) */
   xpCounts: { date: MOCK_TODAY, add_transaction: 0, review: 0 } as {
     date: string;

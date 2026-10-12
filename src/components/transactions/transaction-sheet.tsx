@@ -148,8 +148,10 @@ function TransactionEditor({
   const remove = async () => {
     setSaving("delete");
     try {
-      await transactionService.deleteTransactions([tx.id]);
-      toast.success("Đã xoá giao dịch", { description: `${tx.description} · ${formatMoney(tx.amount)}` });
+      const { xpRemoved } = await transactionService.deleteTransactions([tx.id]);
+      toast.success("Đã xoá giao dịch", {
+        description: `${tx.description} · ${formatMoney(tx.amount)}${xpRemoved ? ` · trừ lại ${xpRemoved} XP đã cộng hôm nay` : ""}`,
+      });
       setConfirmDelete(false);
       onDeleted();
     } catch (e) {

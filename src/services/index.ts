@@ -10,4 +10,5 @@ export * as gamificationService from "./gamification.service";
 export * as budgetService from "./budget.service";
 export * as walletService from "./wallet.service";
 export * as categoryService from "./category.service";
-export { onDataChanged } from "./events";
+export * as chatService from "./chat.service";
+export { onCelebrate, onDataChanged, type Celebration } from "./events";

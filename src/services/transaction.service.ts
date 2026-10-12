@@ -2,6 +2,7 @@ import type {
   Category,
   ClassificationRule,
   CreateRuleResult,
+  DeleteResult,
   QuickEntryPreview,
   QuickEntryResult,
   ReviewResult,
@@ -21,8 +22,11 @@ import {
   applyToWallet,
   awardXp,
   bumpMission,
+  evaluateBadges,
   normalize,
   recordActivity,
+  rememberTransactionXp,
+  revokeTransactionXp,
   scopedTransactions,
   scopedWallets,
   toView,
@@ -219,24 +223,35 @@ export async function updateTransaction(id: string, patch: TransactionPatch): Pr
   }
   applyToWallet(t, 1);
 
-  const ruleSuggestion =
-    patch.categoryId && patch.categoryId !== prevCategoryId ? buildRuleSuggestion(t, patch.categoryId) : null;
+  const categoryChanged = !!patch.categoryId && patch.categoryId !== prevCategoryId;
+  // Sửa danh mục của giao dịch do AI phân loại = dạy AI (huy hiệu "Thầy giáo của AI")
+  if (categoryChanged && t.source !== "form") {
+    db.session.corrections += 1;
+    evaluateBadges();
+  }
+  const ruleSuggestion = categoryChanged ? buildRuleSuggestion(t, patch.categoryId!) : null;
   emitDataChanged();
   return { transaction: toView(t), ruleSuggestion };
 }
 
-export async function deleteTransactions(ids: string[]): Promise<number> {
+/**
+ * Xoá giao dịch. Giao dịch được ghi và cộng XP trong hôm nay thì trừ lại đúng số XP đó
+ * (PRD §13.1, chống spam ghi rồi xoá); tổng XP không bao giờ âm.
+ */
+export async function deleteTransactions(ids: string[]): Promise<DeleteResult> {
   await simulateLatency(400);
   let removed = 0;
+  let xpRemoved = 0;
   for (const id of ids) {
     const i = db.transactions.findIndex((t) => t.id === id);
     if (i === -1) continue;
     applyToWallet(db.transactions[i], -1);
     db.transactions.splice(i, 1);
+    xpRemoved += revokeTransactionXp(id);
     removed += 1;
   }
   emitDataChanged();
-  return removed;
+  return { removed, xpRemoved };
 }
 
 /**
@@ -282,8 +297,11 @@ export async function reviewTransaction(id: string, categoryId?: string): Promis
   t.status = "confirmed";
 
   const xp = awardXp("review");
-  recordActivity();
+  recordActivity("review_transaction");
   bumpMission("m-d-review");
+  bumpMission("m-w-review10");
+  if (changed) db.session.corrections += 1;
+  evaluateBadges();
 
   const ruleSuggestion = changed ? buildRuleSuggestion(t, categoryId!) : null;
   emitDataChanged();
@@ -421,9 +439,12 @@ export async function createFromQuickEntry(preview: QuickEntryPreview): Promise<
 
   // Gamification: +10 XP, cập nhật chuỗi ngày và nhiệm vụ "Ghi 3 giao dịch"
   const xp = awardXp("add_transaction");
+  rememberTransactionXp(transaction.id, xp.xp);
   let message = db.motivationMessages.find((m) => m.context === "after_transaction")!.template;
-  if (recordActivity()) message = `Chuỗi ${db.streak.currentStreak} ngày rồi! ${message}`;
+  const activity = recordActivity("add_transaction");
+  if (activity.streakIncreased) message = `Chuỗi ${db.streak.currentStreak} ngày rồi! ${message}`;
   bumpMission("m-d-3tx");
+  evaluateBadges();
 
   emitDataChanged();
   return {

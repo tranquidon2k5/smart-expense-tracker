@@ -2,15 +2,16 @@
  * Kịch bản giả lập để kiểm tra trạng thái giao diện, đọc từ URL:
  *   ?demo=empty    → tài khoản mới, chưa có dữ liệu
  *   ?demo=loading  → request không bao giờ trả về (xem skeleton)
- *   ?demo=error    → các API danh sách giao dịch trả lỗi (xem trạng thái lỗi)
+ *   ?demo=error    → các API danh sách trả lỗi (xem trạng thái lỗi)
+ *   ?demo=slow     → trợ lý AI trả lời quá 5 giây (xem trạng thái quá thời gian)
  * Mặc định: dữ liệu đầy đủ, độ trễ mạng ~500ms.
  */
-export type MockScenario = "default" | "empty" | "loading" | "error";
+export type MockScenario = "default" | "empty" | "loading" | "error" | "slow";
 
 export function getScenario(): MockScenario {
   if (typeof window === "undefined") return "default";
   const value = new URLSearchParams(window.location.search).get("demo");
-  return value === "empty" || value === "loading" || value === "error" ? value : "default";
+  return value === "empty" || value === "loading" || value === "error" || value === "slow" ? value : "default";
 }
 
 export function simulateLatency(ms = 500): Promise<void> {

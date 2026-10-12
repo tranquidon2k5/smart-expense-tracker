@@ -1,6 +1,6 @@
 import type { Budget, BudgetOverview, BudgetRow, Transaction } from "@/types";
 import * as db from "./mock/db";
-import { scopedTransactions } from "./mock/queries";
+import { evaluateBadges, scopedTransactions } from "./mock/queries";
 import { failIfErrorScenario, getScenario, simulateLatency } from "./mock/scenario";
 import { emitDataChanged } from "./events";
 
@@ -101,6 +101,7 @@ export async function setBudget(categoryId: string, limitAmount: number, month =
     limitAmount: Math.round(limitAmount),
   };
   db.budgets.push(budget);
+  evaluateBadges(); // "Người lập kế hoạch": đủ 3 danh mục có ngân sách
   emitDataChanged();
   return budget;
 }
