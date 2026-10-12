@@ -1,22 +1,56 @@
 import type {
   Category,
+  ClassificationRule,
+  CreateRuleResult,
   QuickEntryPreview,
   QuickEntryResult,
+  ReviewResult,
+  RulePreview,
+  RuleSuggestion,
   Transaction,
+  TransactionFilter,
+  TransactionPatch,
   TransactionType,
   TransactionView,
+  UpdateResult,
   Wallet,
 } from "@/types";
 import * as db from "./mock/db";
-import { simulateLatency } from "./mock/scenario";
-import { normalize, scopedTransactions, scopedWallets, toView } from "./mock/queries";
+import { failIfErrorScenario, simulateLatency } from "./mock/scenario";
+import {
+  addXp,
+  applyToWallet,
+  bumpMission,
+  normalize,
+  recordActivity,
+  scopedTransactions,
+  scopedWallets,
+  toView,
+} from "./mock/queries";
 import { emitDataChanged } from "./events";
+import { extractKeyword, matchesKeyword, planRuleApplication } from "./rules";
+
+/** XP theo PRD §6.4 */
+const XP_ADD_TRANSACTION = 10;
+const XP_REVIEW = 5;
+/** Ngưỡng độ tin cậy: thấp hơn → hàng chờ duyệt (PRD §9.1) */
+export const CONFIDENCE_THRESHOLD = 0.7;
 
 function byNewest(a: Transaction, b: Transaction) {
   return b.date.localeCompare(a.date) || b.id.localeCompare(a.id);
 }
 
-// ───────────── API công khai ─────────────
+function findOrThrow(id: string): Transaction {
+  const t = db.transactions.find((x) => x.id === id);
+  if (!t) throw new Error("Không tìm thấy giao dịch, có thể đã bị xoá.");
+  return t;
+}
+
+function pendingCount(): number {
+  return scopedTransactions().filter((t) => t.status === "pending").length;
+}
+
+// ───────────── Đọc ─────────────
 
 /** Ngày "hôm nay" theo múi giờ người dùng (bản demo cố định 12/10/2026) */
 export function getToday(): string {
@@ -47,6 +81,216 @@ export async function searchTransactions(query: string, limit = 8): Promise<Tran
     .map(toView)
     .filter((t) => normalize(`${t.description} ${t.category.name} ${t.wallet.name}`).includes(q))
     .slice(0, limit);
+}
+
+/** Danh sách giao dịch theo bộ lọc, mới nhất trước (sắp xếp khác do bảng xử lý) */
+export async function listTransactions(filter: TransactionFilter = {}): Promise<TransactionView[]> {
+  await simulateLatency(450);
+  failIfErrorScenario();
+  const q = filter.query ? normalize(filter.query.trim()) : "";
+  return [...scopedTransactions()]
+    .filter((t) => {
+      if (filter.from && t.date < filter.from) return false;
+      if (filter.to && t.date > filter.to) return false;
+      if (filter.type && t.type !== filter.type) return false;
+      if (filter.status && t.status !== filter.status) return false;
+      if (filter.walletIds?.length && !filter.walletIds.includes(t.walletId)) return false;
+      if (filter.categoryIds?.length && !filter.categoryIds.includes(t.categoryId)) return false;
+      if (filter.minAmount != null && t.amount < filter.minAmount) return false;
+      if (filter.maxAmount != null && t.amount > filter.maxAmount) return false;
+      return true;
+    })
+    .sort(byNewest)
+    .map(toView)
+    .filter((t) => !q || normalize(`${t.description} ${t.category.name} ${t.wallet.name}`).includes(q));
+}
+
+export async function getTransaction(id: string): Promise<TransactionView | null> {
+  await simulateLatency(200);
+  failIfErrorScenario();
+  const t = scopedTransactions().find((x) => x.id === id);
+  return t ? toView(t) : null;
+}
+
+/** Hàng chờ duyệt: giao dịch AI phân loại với độ tin cậy < 0,7 */
+export async function listPendingTransactions(): Promise<TransactionView[]> {
+  await simulateLatency(400);
+  failIfErrorScenario();
+  return scopedTransactions()
+    .filter((t) => t.status === "pending")
+    .sort(byNewest)
+    .map(toView);
+}
+
+// ───────────── Luật từ khoá (F08) ─────────────
+
+function matchRule(text: string): ClassificationRule | undefined {
+  return db.classificationRules.find((r) => matchesKeyword(text, r.keyword));
+}
+
+function categoryOrThrow(categoryId: string): Category {
+  const category = db.categories.find((c) => c.id === categoryId);
+  if (!category) throw new Error("Danh mục không tồn tại.");
+  return category;
+}
+
+function buildRuleSuggestion(t: Transaction, newCategoryId: string): RuleSuggestion | null {
+  if (t.source === "form") return null;
+  const keyword = extractKeyword(t.description);
+  if (!keyword) return null;
+  const exists = db.classificationRules.some(
+    (r) => normalize(r.keyword) === normalize(keyword) && r.categoryId === newCategoryId,
+  );
+  if (exists) return null;
+  const matchingPendingCount = planRuleApplication(scopedTransactions(), keyword, categoryOrThrow(newCategoryId), t.id).filter(
+    (p) => !p.typeMismatch,
+  ).length;
+  return { transactionId: t.id, keyword, categoryId: newCategoryId, matchingPendingCount };
+}
+
+/**
+ * Xem trước: những giao dịch chờ duyệt nào luật sẽ phân loại lại, giao dịch nào đang thuộc
+ * danh mục khác (cần cảnh báo), giao dịch nào bị bỏ qua vì khác loại thu/chi.
+ * Dùng cùng planRuleApplication với createRule nên xem trước luôn khớp kết quả thật.
+ */
+export async function previewRule(keyword: string, categoryId: string, excludeId?: string): Promise<RulePreview> {
+  await simulateLatency(200);
+  const category = categoryOrThrow(categoryId);
+  const items = planRuleApplication(scopedTransactions(), keyword, category, excludeId).map((p) => ({
+    ...p,
+    transaction: toView(p.transaction),
+  }));
+  return {
+    keyword: keyword.trim().toUpperCase(),
+    categoryId,
+    items,
+    applicableCount: items.filter((i) => !i.typeMismatch).length,
+    conflictCount: items.filter((i) => i.conflict).length,
+  };
+}
+
+/**
+ * Tạo luật từ khoá → danh mục. Mặc định KHÔNG đụng tới các giao dịch chờ duyệt khác;
+ * chỉ khi `applyToPending` mới phân loại lại đúng danh sách mà previewRule trả về.
+ */
+export async function createRule(
+  keyword: string,
+  categoryId: string,
+  applyToPending = false,
+): Promise<CreateRuleResult> {
+  await simulateLatency(350);
+  const clean = keyword.trim().toUpperCase();
+  if (!clean) throw new Error("Từ khoá không được để trống.");
+  const category = categoryOrThrow(categoryId);
+
+  const rule: ClassificationRule = {
+    id: `r-${Date.now()}`,
+    userId: db.USER_ID,
+    keyword: clean,
+    categoryId,
+    createdFrom: "correction",
+  };
+  db.classificationRules.unshift(rule);
+
+  let appliedCount = 0;
+  if (applyToPending) {
+    for (const { transaction: t, typeMismatch } of planRuleApplication(scopedTransactions(), clean, category)) {
+      if (typeMismatch) continue;
+      t.categoryId = categoryId;
+      t.aiConfidence = 0.95;
+      t.status = "confirmed";
+      appliedCount += 1;
+    }
+    if (appliedCount) bumpMission("m-d-review", appliedCount);
+  }
+  emitDataChanged();
+  return { rule, appliedCount };
+}
+
+// ───────────── Ghi ─────────────
+
+export async function updateTransaction(id: string, patch: TransactionPatch): Promise<UpdateResult> {
+  await simulateLatency(400);
+  const t = findOrThrow(id);
+  if (patch.amount != null && patch.amount <= 0) throw new Error("Số tiền phải lớn hơn 0đ.");
+  const prevCategoryId = t.categoryId;
+
+  applyToWallet(t, -1);
+  Object.assign(t, patch);
+  if (patch.categoryId) {
+    t.type = db.categories.find((c) => c.id === patch.categoryId)!.type;
+  }
+  applyToWallet(t, 1);
+
+  const ruleSuggestion =
+    patch.categoryId && patch.categoryId !== prevCategoryId ? buildRuleSuggestion(t, patch.categoryId) : null;
+  emitDataChanged();
+  return { transaction: toView(t), ruleSuggestion };
+}
+
+export async function deleteTransactions(ids: string[]): Promise<number> {
+  await simulateLatency(400);
+  let removed = 0;
+  for (const id of ids) {
+    const i = db.transactions.findIndex((t) => t.id === id);
+    if (i === -1) continue;
+    applyToWallet(db.transactions[i], -1);
+    db.transactions.splice(i, 1);
+    removed += 1;
+  }
+  emitDataChanged();
+  return removed;
+}
+
+/**
+ * Sửa hàng loạt. Đổi danh mục chỉ áp cho giao dịch cùng loại (thu/chi) với danh mục đích.
+ */
+export async function bulkUpdateTransactions(
+  ids: string[],
+  patch: Pick<TransactionPatch, "categoryId" | "walletId">,
+): Promise<{ updated: number; skipped: number }> {
+  await simulateLatency(450);
+  const category = patch.categoryId ? db.categories.find((c) => c.id === patch.categoryId) : undefined;
+  let updated = 0;
+  let skipped = 0;
+  for (const id of ids) {
+    const t = db.transactions.find((x) => x.id === id);
+    if (!t) continue;
+    if (category && category.type !== t.type) {
+      skipped += 1;
+      continue;
+    }
+    applyToWallet(t, -1);
+    if (patch.walletId) t.walletId = patch.walletId;
+    if (category) t.categoryId = category.id;
+    applyToWallet(t, 1);
+    updated += 1;
+  }
+  emitDataChanged();
+  return { updated, skipped };
+}
+
+/**
+ * Duyệt một giao dịch chờ (F08). Truyền categoryId nếu người dùng sửa danh mục AI đoán —
+ * khi đó trả về gợi ý tạo luật từ khoá. +5 XP, tính vào chuỗi ngày.
+ */
+export async function reviewTransaction(id: string, categoryId?: string): Promise<ReviewResult> {
+  await simulateLatency(300);
+  const t = findOrThrow(id);
+  const changed = !!categoryId && categoryId !== t.categoryId;
+  if (changed) {
+    t.categoryId = categoryId!;
+    t.type = db.categories.find((c) => c.id === categoryId)!.type;
+  }
+  t.status = "confirmed";
+
+  addXp(XP_REVIEW);
+  recordActivity();
+  bumpMission("m-d-review");
+
+  const ruleSuggestion = changed ? buildRuleSuggestion(t, categoryId!) : null;
+  emitDataChanged();
+  return { transaction: toView(t), xpGained: XP_REVIEW, ruleSuggestion, remainingPending: pendingCount() };
 }
 
 // ───────────── Ghi nhanh bằng câu tự nhiên (giả lập F07 + F08) ─────────────
@@ -120,9 +364,12 @@ export async function parseQuickEntry(text: string): Promise<QuickEntryPreview> 
   const { date, match: dateMatch } = parseDate(text);
   const norm = ` ${normalize(text).replace(/[^a-z0-9]+/g, " ")} `;
 
+  // Luật người dùng chạy trước luật mặc định (F08: hybrid, luật trước rồi mới tới LLM)
+  const userRule = matchRule(text);
   const rule = KEYWORD_RULES.find((r) => r.keywords.some((k) => norm.includes(k)));
   const inferredIncome = INCOME_HINTS.some((k) => norm.includes(k));
-  const category = rule ? db.categories.find((c) => c.id === rule.categoryId)! : null;
+  const categoryId = userRule?.categoryId ?? rule?.categoryId;
+  const category = categoryId ? db.categories.find((c) => c.id === categoryId)! : null;
   const type: TransactionType = category?.type ?? (inferredIncome ? "income" : "expense");
 
   const walletId = norm.includes("momo")
@@ -142,8 +389,8 @@ export async function parseQuickEntry(text: string): Promise<QuickEntryPreview> 
     date,
     description: cleanDescription(text, [amountMatch, dateMatch]) || text,
     categoryId: category?.id ?? (type === "income" ? "c-income-other" : "c-other"),
-    // Khớp luật từ khoá → tin cậy cao; không khớp → "LLM" đoán với độ tin cậy thấp
-    confidence: rule ? 0.95 : 0.55,
+    // Khớp luật → tin cậy cao; không khớp → "LLM" đoán với độ tin cậy thấp
+    confidence: userRule ? 0.97 : rule ? 0.95 : 0.55,
     walletId,
   };
 }
@@ -164,30 +411,17 @@ export async function createFromQuickEntry(preview: QuickEntryPreview): Promise<
     description: preview.description,
     source: "nlp",
     aiConfidence: preview.confidence,
-    status: preview.confidence >= 0.7 ? "confirmed" : "pending",
+    status: preview.confidence >= CONFIDENCE_THRESHOLD ? "confirmed" : "pending",
   };
   db.transactions.push(transaction);
-
-  const wallet = db.wallets.find((w) => w.id === transaction.walletId)!;
-  wallet.balance += transaction.type === "income" ? transaction.amount : -transaction.amount;
+  applyToWallet(transaction, 1);
 
   // Gamification: +10 XP, cập nhật chuỗi ngày và nhiệm vụ "Ghi 3 giao dịch"
-  const xpGained = 10;
-  db.level.totalXp += xpGained;
+  addXp(XP_ADD_TRANSACTION);
   let message = db.motivationMessages.find((m) => m.context === "after_transaction")!.template;
-  if (!db.session.activeToday) {
-    db.session.activeToday = true;
-    db.streak.currentStreak += 1;
-    db.streak.lastActiveDate = db.MOCK_TODAY;
-    db.streak.longestStreak = Math.max(db.streak.longestStreak, db.streak.currentStreak);
-    message = `Chuỗi ${db.streak.currentStreak} ngày rồi! ${message}`;
-  }
-  const daily = db.userMissions.find((m) => m.missionId === "m-d-3tx")!;
-  if (daily.progress < 3) {
-    daily.progress += 1;
-    if (daily.progress === 3) daily.completedAt = new Date().toISOString();
-  }
+  if (recordActivity()) message = `Chuỗi ${db.streak.currentStreak} ngày rồi! ${message}`;
+  bumpMission("m-d-3tx");
 
   emitDataChanged();
-  return { transaction: toView(transaction), xpGained, streak: { ...db.streak }, message };
+  return { transaction: toView(transaction), xpGained: XP_ADD_TRANSACTION, streak: { ...db.streak }, message };
 }

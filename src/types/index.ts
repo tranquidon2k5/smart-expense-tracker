@@ -297,3 +297,74 @@ export interface QuickEntryResult {
 export interface SearchResult {
   transactions: TransactionView[];
 }
+
+// ───────────── Trang Giao dịch (F04, F08, Luồng 2) ─────────────
+
+export interface TransactionFilter {
+  /** ISO date, bao gồm cả hai đầu; undefined = không giới hạn */
+  from?: ISODate;
+  to?: ISODate;
+  walletIds?: ID[];
+  categoryIds?: ID[];
+  minAmount?: number;
+  maxAmount?: number;
+  type?: TransactionType;
+  status?: TransactionStatus;
+  /** Tìm theo mô tả, danh mục, ví (không phân biệt dấu) */
+  query?: string;
+}
+
+export interface TransactionPatch {
+  amount?: number;
+  type?: TransactionType;
+  categoryId?: ID;
+  walletId?: ID;
+  date?: ISODate;
+  description?: string;
+}
+
+/** Gợi ý tạo luật từ khoá khi người dùng sửa danh mục AI đoán (F08) */
+export interface RuleSuggestion {
+  transactionId: ID;
+  keyword: string;
+  categoryId: ID;
+  /** Số giao dịch chờ duyệt khác cũng chứa từ khoá này */
+  matchingPendingCount: number;
+}
+
+export interface UpdateResult {
+  transaction: TransactionView;
+  ruleSuggestion: RuleSuggestion | null;
+}
+
+export interface ReviewResult {
+  transaction: TransactionView;
+  xpGained: number;
+  ruleSuggestion: RuleSuggestion | null;
+  remainingPending: number;
+}
+
+export interface RulePreviewItem {
+  transaction: TransactionView;
+  /** Đang ở danh mục khác danh mục của luật → sẽ bị đổi danh mục */
+  conflict: boolean;
+  /** Khác loại thu/chi → luật bỏ qua giao dịch này */
+  typeMismatch: boolean;
+}
+
+/** Xem trước tác động của luật lên các giao dịch chờ duyệt khác */
+export interface RulePreview {
+  keyword: string;
+  categoryId: ID;
+  items: RulePreviewItem[];
+  /** Số giao dịch sẽ thực sự được áp dụng (không tính khác loại) */
+  applicableCount: number;
+  /** Số giao dịch sẽ bị đổi từ danh mục khác sang danh mục của luật */
+  conflictCount: number;
+}
+
+export interface CreateRuleResult {
+  rule: ClassificationRule;
+  /** Số giao dịch chờ duyệt đã được phân loại lại theo luật mới */
+  appliedCount: number;
+}

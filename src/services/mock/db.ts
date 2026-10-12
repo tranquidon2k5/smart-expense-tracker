@@ -5,6 +5,7 @@
  */
 import type {
   Badge,
+  ClassificationRule,
   Budget,
   Category,
   Mission,
@@ -144,6 +145,10 @@ function nlp(confidence: number): Partial<Transaction> {
   return { source: "nlp", aiConfidence: confidence };
 }
 
+function pendingCsv(confidence: number): Partial<Transaction> {
+  return { source: "csv", aiConfidence: confidence, status: "pending" };
+}
+
 for (const month of [5, 6, 7, 8, 9]) {
   const y = 2026;
   const prev = month - 1;
@@ -225,13 +230,27 @@ const october: [string, string, number, string, string, Partial<Transaction>?][]
   ["2026-10-11", "c-fun", 220_000, "Karaoke với nhóm bạn", "w-tcb"],
   ["2026-10-11", "c-shop", 129_000, "Shopee - đồ gia dụng", "w-tcb"],
   ["2026-10-11", "c-food", 45_000, "Bún bò Huế", "w-cash", nlp(0.96)],
-  // Hai giao dịch AI chưa chắc chắn → hàng chờ duyệt
-  ["2026-10-11", "c-food", 120_000, "THANH TOAN QR 0912XXX", "w-momo", { source: "csv", aiConfidence: 0.62, status: "pending" }],
-  ["2026-10-11", "c-other", 500_000, "CK NGUYEN VAN A chuyen tien", "w-vcb", { source: "csv", aiConfidence: 0.55, status: "pending" }],
+  // Import sao kê CSV (Luồng 2): AI chưa chắc chắn (< 0,7) → hàng chờ duyệt.
+  // categoryId ở đây là danh mục AI đoán.
+  ["2026-10-07", "c-food", 52_000, "GRAB*RIDE 1203 HCM", "w-tcb", pendingCsv(0.51)],
+  ["2026-10-08", "c-food", 64_000, "GRAB*RIDE 8812 HCM", "w-tcb", pendingCsv(0.52)],
+  ["2026-10-09", "c-food", 41_000, "GRAB*FOOD 3021 HCM", "w-tcb", pendingCsv(0.48)],
+  ["2026-10-09", "c-shop", 187_000, "VNPAY*BHX 0021 Q3", "w-vcb", pendingCsv(0.58)],
+  ["2026-10-10", "c-bill", 100_000, "MOMO*NAP TIEN DT 0903", "w-momo", pendingCsv(0.66)],
+  ["2026-10-10", "c-food", 75_000, "HIGHLANDS CF NGUYEN HUE", "w-tcb", pendingCsv(0.69)],
+  ["2026-10-11", "c-food", 120_000, "THANH TOAN QR 0912XXX", "w-momo", pendingCsv(0.62)],
+  ["2026-10-11", "c-other", 500_000, "CK NGUYEN VAN A chuyen tien", "w-vcb", pendingCsv(0.55)],
 ];
 for (const [date, cat, amount, desc, wallet, extra] of october) add(date, cat, amount, desc, wallet, extra);
 
 export const transactions: Transaction[] = generated;
+
+// Luật từ khoá (F08): luật mặc định + luật người dùng tạo khi sửa phân loại
+export const classificationRules: ClassificationRule[] = [
+  { id: "r-1", userId: USER_ID, keyword: "SHOPEE", categoryId: "c-shop", createdFrom: "user" },
+  { id: "r-2", userId: USER_ID, keyword: "NETFLIX", categoryId: "c-fun", createdFrom: "user" },
+  { id: "r-3", userId: USER_ID, keyword: "PHUC LONG", categoryId: "c-food", createdFrom: "correction" },
+];
 
 export const budgets: Budget[] = [
   { id: "b-food", userId: USER_ID, categoryId: "c-food", month: "2026-10", limitAmount: 3_000_000 },
@@ -270,7 +289,7 @@ export const LEVEL_TITLES: Record<number, string> = {
 export const missions: Mission[] = [
   { id: "m-d-3tx", code: "DAILY_3_TX", title: "Ghi ít nhất 3 giao dịch", period: "daily", target: 3, xp: 20 },
   { id: "m-d-chat", code: "DAILY_ASK_CHAT", title: "Hỏi trợ lý AI 1 câu", period: "daily", target: 1, xp: 20 },
-  { id: "m-d-review", code: "DAILY_REVIEW_ALL", title: "Duyệt hết giao dịch chờ", period: "daily", target: 2, xp: 20 },
+  { id: "m-d-review", code: "DAILY_REVIEW_ALL", title: "Duyệt hết giao dịch chờ", period: "daily", target: 8, xp: 20 },
   { id: "m-w-5days", code: "WEEKLY_5_DAYS", title: "Ghi chép đủ 5/7 ngày", period: "weekly", target: 5, xp: 100 },
 ];
 

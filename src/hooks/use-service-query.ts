@@ -5,53 +5,60 @@ import { onDataChanged } from "@/services";
 
 export interface QueryState<T> {
   data: T | undefined;
-  /** true chỉ ở lần tải đầu — các lần làm mới giữ dữ liệu cũ, không nháy skeleton */
+  /** true khi chưa có dữ liệu nào (lần tải đầu) — hiện skeleton */
   loading: boolean;
+  /** true mỗi khi đang gọi lại (đổi bộ lọc, dữ liệu thay đổi) — giữ dữ liệu cũ, không nháy skeleton */
+  fetching: boolean;
   error: Error | undefined;
   refetch: () => void;
 }
 
-/** Gọi một hàm service, tự tải lại khi dữ liệu thay đổi (vd. vừa ghi giao dịch). */
-export function useServiceQuery<T>(fetcher: () => Promise<T>): QueryState<T> {
+/**
+ * Gọi một hàm service, tự tải lại khi dữ liệu thay đổi (vd. vừa ghi giao dịch)
+ * hoặc khi `key` đổi (vd. bộ lọc). `key` nên là chuỗi mô tả tham số của fetcher.
+ */
+export function useServiceQuery<T>(fetcher: () => Promise<T>, key = ""): QueryState<T> {
   const [data, setData] = React.useState<T>();
   const [error, setError] = React.useState<Error>();
-  const [loading, setLoading] = React.useState(true);
+  const [fetching, setFetching] = React.useState(true);
   const fetcherRef = React.useRef(fetcher);
+  const runIdRef = React.useRef(0);
   React.useLayoutEffect(() => {
     fetcherRef.current = fetcher;
   });
 
   const run = React.useCallback(() => {
-    let cancelled = false;
+    const runId = ++runIdRef.current;
+    setFetching(true);
     fetcherRef
       .current()
       .then((result) => {
-        if (cancelled) return;
+        if (runId !== runIdRef.current) return;
         setData(result);
         setError(undefined);
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e : new Error(String(e)));
+        if (runId !== runIdRef.current) return;
+        setError(e instanceof Error ? e : new Error(String(e)));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (runId === runIdRef.current) setFetching(false);
       });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   React.useEffect(() => {
-    let cancel = run();
-    const unsubscribe = onDataChanged(() => {
-      cancel();
-      cancel = run();
-    });
-    return () => {
-      cancel();
-      unsubscribe();
-    };
-  }, [run]);
+    // Gọi lại khi key đổi; bỏ kết quả của lần gọi cũ (runId)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đồng bộ với nguồn dữ liệu ngoài (service)
+    run();
+    return onDataChanged(run);
+  }, [run, key]);
 
-  return { data, loading, error, refetch: run };
+  React.useEffect(
+    () => () => {
+      runIdRef.current += 1;
+    },
+    [],
+  );
+
+  return { data, loading: data === undefined && fetching && !error, fetching, error, refetch: run };
 }

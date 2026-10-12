@@ -57,7 +57,25 @@ export function formatPercent(value: number, digits = 0): string {
   return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: digits }).format(value)}%`;
 }
 
-const WEEKDAYS = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+/** "2026-10-12" → Date (giờ địa phương, không lệch múi giờ) */
+export function isoToDate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Date → "2026-10-12" theo giờ địa phương */
+export function dateToIso(date: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+}
+
+export function addDaysIso(iso: string, delta: number): string {
+  const d = isoToDate(iso);
+  d.setDate(d.getDate() + delta);
+  return dateToIso(d);
+}
+
+const WEEKDAYS =["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
 
 /** "Thứ Hai, 12/10/2026" */
 export function formatWeekdayDate(iso: string): string {
