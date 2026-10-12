@@ -1,0 +1,192 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Font: biến do next/font gắn lên <html>. Dùng @theme (không inline) để
+ * Tailwind giữ var() và phân giải lúc chạy.
+ *  - font-sans: Be Vietnam Pro — chữ, tiêu đề, nhãn
+ *  - font-num:  Inter + tabular-nums — mọi con số (xem MASTER.md › Typography)
+ */
+@theme {
+  --font-sans: var(--font-be-vietnam), "Noto Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-be-vietnam), "Noto Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-num: var(--font-inter), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-row-hover: var(--row-hover);
+  --color-grid: var(--grid);
+  --color-surface-subtle: var(--surface-subtle);
+
+  /* Thu / Chi */
+  --color-income: var(--income);
+  --color-income-soft: var(--income-soft);
+  --color-expense: var(--expense);
+  --color-expense-soft: var(--expense-soft);
+
+  /* Gamification — chỉ dùng cho streak, XP, huy hiệu */
+  --color-streak: var(--streak);
+  --color-streak-text: var(--streak-text);
+  --color-streak-soft: var(--streak-soft);
+  --color-xp: var(--xp);
+  --color-xp-text: var(--xp-text);
+  --color-xp-soft: var(--xp-soft);
+  --color-freeze: var(--freeze);
+
+  /* Trạng thái */
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /*
+   * Bo góc theo MASTER.md, khớp quy ước class của shadcn:
+   *   rounded-md 6px (chip, badge) · rounded-lg 8px (button, input, menu)
+   *   rounded-xl 12px (card, popover) · rounded-2xl 16px (dialog, sheet)
+   */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+}
+
+/* Bảng màu light — giá trị và tỉ lệ tương phản ở MASTER.md */
+:root {
+  --radius: 0.5rem;
+
+  --background: #f6f8f7;
+  --foreground: #132a26;
+  --card: #ffffff;
+  --card-foreground: #132a26;
+  --popover: #ffffff;
+  --popover-foreground: #132a26;
+  --primary: #0f766e;
+  --primary-hover: #115e59;
+  --primary-foreground: #ffffff;
+  --secondary: #e6f6f3;
+  --secondary-foreground: #0f766e;
+  --muted: #eef2f1;
+  --muted-foreground: #55665f;
+  --accent: #e6f6f3;
+  --accent-foreground: #0f766e;
+  --destructive: #dc2626;
+  --border: #dce5e2;
+  --input: #7c8d86;
+  --ring: #0f766e;
+  --row-hover: #f1f6f4;
+  --grid: #e8eeec;
+  --surface-subtle: #fafbfb;
+
+  --income: #15803d;
+  --income-soft: #dcfce7;
+  --expense: #be123c;
+  --expense-soft: #ffe4e6;
+
+  --streak: #ea580c;
+  --streak-text: #c2410c;
+  --streak-soft: #fff1e6;
+  --xp: #d97706;
+  --xp-text: #92400e;
+  --xp-soft: #fef3c7;
+  --freeze: #0369a1;
+
+  --warning: #b45309;
+  --danger: #dc2626;
+  --info: #0369a1;
+
+  --chart-1: #2563eb;
+  --chart-2: #7c3aed;
+  --chart-3: #4d7c0f;
+  --chart-4: #db2777;
+  --chart-5: #64748b;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #132a26;
+  --sidebar-primary: #0f766e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e6f6f3;
+  --sidebar-accent-foreground: #0f766e;
+  --sidebar-border: #dce5e2;
+  --sidebar-ring: #0f766e;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply font-sans;
+    scroll-padding-top: 80px;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  /* Focus ring thống nhất: 2px primary, offset 2px (MASTER.md › Tương tác) */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  select,
+  summary {
+    cursor: pointer;
+  }
+}
+
+@layer utilities {
+  /* Mọi con số: Inter + tabular figures */
+  .num {
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
