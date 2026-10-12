@@ -93,7 +93,7 @@ export function ActivityHeatmap({ days, today }: { days: ActivityDay[]; today: s
       description={
         <>
           <span className="num">{activeDays}</span> ngày có ghi chép · <span className="num">{totalActions}</span> lần ghi trong{" "}
-          <span className="num">{Math.round(days.length / 7)}</span> tuần gần nhất
+          <span className="num">{weeks.length}</span> tuần gần nhất
         </>
       }
       action={

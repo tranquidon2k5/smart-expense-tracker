@@ -215,7 +215,7 @@ function SourcesPanel({ message, question }: { message: ChatMessageView | null; 
 export function AssistantPage() {
   const list = useServiceQuery(() => chatService.listConversations());
   const [conversation, setConversation] = React.useState<Conversation | null>(null);
-  const [openedInitial, setOpenedInitial] = React.useState(false);
+  const openedInitial = React.useRef(false);
   const [loadingConversation, setLoadingConversation] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState<Pending | null>(null);
@@ -223,28 +223,38 @@ export function AssistantPage() {
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
   const logRef = React.useRef<HTMLOListElement>(null);
+  // Mỗi lần mở / tạo cuộc trò chuyện tăng số này; kết quả tải về muộn của lần trước bị bỏ qua
+  const openSeq = React.useRef(0);
 
   const open = React.useCallback(async (id: string) => {
+    const seq = ++openSeq.current;
     setLoadingConversation(true);
     setHistoryOpen(false);
     setPending(null);
     try {
       const c = await chatService.getConversation(id);
+      if (seq !== openSeq.current) return;
       setConversation(c);
       const lastAnswer = c?.messages.filter((m) => m.role === "assistant").at(-1);
       setSelectedId(lastAnswer && lastAnswer.sourceIds.length ? lastAnswer.id : null);
     } finally {
-      setLoadingConversation(false);
+      if (seq === openSeq.current) setLoadingConversation(false);
     }
   }, []);
 
   // Lần đầu: mở cuộc trò chuyện gần nhất (lịch sử hội thoại)
-  if (!openedInitial && list.data) {
-    setOpenedInitial(true);
-    if (list.data[0]) void open(list.data[0].id);
-  }
+  const initialId = list.data?.[0]?.id;
+  React.useEffect(() => {
+    if (openedInitial.current || !list.data) return;
+    openedInitial.current = true;
+    // Đồng bộ với dữ liệu tải từ service (nguồn ngoài React)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (initialId) void open(initialId);
+  }, [list.data, initialId, open]);
 
   const newChat = () => {
+    openSeq.current += 1; // huỷ lần mở cuộc trò chuyện đang tải dở
+    setLoadingConversation(false);
     setConversation(null);
     setSelectedId(null);
     setPending(null);
