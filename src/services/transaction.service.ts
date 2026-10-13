@@ -32,10 +32,14 @@ import {
   toView,
 } from "./mock/queries";
 import { emitDataChanged } from "./events";
-import { extractKeyword, matchesKeyword, planRuleApplication } from "./rules";
+import { extractKeyword, planRuleApplication } from "./rules";
+import { CONFIDENCE_THRESHOLD, classifyByRules, guessWallet, parseQuickEntryText } from "@shared/quick-entry";
+import { USE_API } from "./data-source";
+import { getApiSession } from "./api/session";
+import { todayIn } from "@shared/dates";
+import * as api from "./api/endpoints";
 
-/** Ngưỡng độ tin cậy: thấp hơn → hàng chờ duyệt (PRD §9.1) */
-export const CONFIDENCE_THRESHOLD = 0.7;
+export { CONFIDENCE_THRESHOLD };
 
 function byNewest(a: Transaction, b: Transaction) {
   return b.date.localeCompare(a.date) || b.id.localeCompare(a.id);
@@ -53,27 +57,37 @@ function pendingCount(): number {
 
 // ───────────── Đọc ─────────────
 
-/** Ngày "hôm nay" theo múi giờ người dùng (bản demo cố định 12/10/2026) */
+/** Ngày "hôm nay" theo múi giờ người dùng (bản mock cố định 12/10/2026) */
 export function getToday(): string {
+  if (USE_API) {
+    // Chưa biết phiên (prerender, trước khi /auth/me trả về): nội dung còn ẩn sau AuthGate → giá trị
+    // cố định để server và client render khớp, không đọc đồng hồ lúc prerender
+    const session = getApiSession();
+    return session ? todayIn(session.timezone ?? "Asia/Ho_Chi_Minh") : db.MOCK_TODAY;
+  }
   return db.MOCK_TODAY;
 }
 
 export async function listCategories(type?: TransactionType): Promise<Category[]> {
+  if (USE_API) return api.transactions.listCategories(type);
   await simulateLatency(150);
   return db.categories.filter((c) => !type || c.type === type);
 }
 
 export async function listWallets(): Promise<Wallet[]> {
+  if (USE_API) return api.transactions.listWallets();
   await simulateLatency(150);
   return scopedWallets();
 }
 
 export async function getRecentTransactions(limit = 8): Promise<TransactionView[]> {
+  if (USE_API) return api.transactions.getRecentTransactions(limit);
   await simulateLatency();
   return [...scopedTransactions()].sort(byNewest).slice(0, limit).map(toView);
 }
 
 export async function searchTransactions(query: string, limit = 8): Promise<TransactionView[]> {
+  if (USE_API) return api.transactions.searchTransactions(query, limit);
   await simulateLatency(200);
   const q = normalize(query.trim());
   if (!q) return [];
@@ -86,6 +100,7 @@ export async function searchTransactions(query: string, limit = 8): Promise<Tran
 
 /** Danh sách giao dịch theo bộ lọc, mới nhất trước (sắp xếp khác do bảng xử lý) */
 export async function listTransactions(filter: TransactionFilter = {}): Promise<TransactionView[]> {
+  if (USE_API) return api.transactions.listTransactions(filter);
   await simulateLatency(450);
   failIfErrorScenario();
   const q = filter.query ? normalize(filter.query.trim()) : "";
@@ -107,6 +122,7 @@ export async function listTransactions(filter: TransactionFilter = {}): Promise<
 }
 
 export async function getTransaction(id: string): Promise<TransactionView | null> {
+  if (USE_API) return api.transactions.getTransaction(id);
   await simulateLatency(200);
   failIfErrorScenario();
   const t = scopedTransactions().find((x) => x.id === id);
@@ -115,6 +131,7 @@ export async function getTransaction(id: string): Promise<TransactionView | null
 
 /** Hàng chờ duyệt: giao dịch AI phân loại với độ tin cậy < 0,7 */
 export async function listPendingTransactions(): Promise<TransactionView[]> {
+  if (USE_API) return api.transactions.listPendingTransactions();
   await simulateLatency(400);
   failIfErrorScenario();
   return scopedTransactions()
@@ -151,6 +168,7 @@ function buildRuleSuggestion(t: Transaction, newCategoryId: string): RuleSuggest
  * Dùng cùng planRuleApplication với createRule nên xem trước luôn khớp kết quả thật.
  */
 export async function previewRule(keyword: string, categoryId: string, excludeId?: string): Promise<RulePreview> {
+  if (USE_API) return api.transactions.previewRule(keyword, categoryId, excludeId);
   await simulateLatency(200);
   const category = categoryOrThrow(categoryId);
   const items = planRuleApplication(scopedTransactions(), keyword, category, excludeId).map((p) => ({
@@ -175,6 +193,7 @@ export async function createRule(
   categoryId: string,
   applyToPending = false,
 ): Promise<CreateRuleResult> {
+  if (USE_API) return api.transactions.createRule(keyword, categoryId, applyToPending);
   await simulateLatency(350);
   const clean = keyword.trim().toUpperCase();
   if (!clean) throw new Error("Từ khoá không được để trống.");
@@ -207,6 +226,7 @@ export async function createRule(
 // ───────────── Ghi ─────────────
 
 export async function updateTransaction(id: string, patch: TransactionPatch): Promise<UpdateResult> {
+  if (USE_API) return api.transactions.updateTransaction(id, patch);
   await simulateLatency(400);
   const t = findOrThrow(id);
   if (patch.amount != null && patch.amount <= 0) throw new Error("Số tiền phải lớn hơn 0đ.");
@@ -235,6 +255,7 @@ export async function updateTransaction(id: string, patch: TransactionPatch): Pr
  * (PRD §13.1, chống spam ghi rồi xoá); tổng XP không bao giờ âm.
  */
 export async function deleteTransactions(ids: string[]): Promise<DeleteResult> {
+  if (USE_API) return api.transactions.deleteTransactions(ids);
   await simulateLatency(400);
   let removed = 0;
   let xpRemoved = 0;
@@ -257,6 +278,7 @@ export async function bulkUpdateTransactions(
   ids: string[],
   patch: Pick<TransactionPatch, "categoryId" | "walletId">,
 ): Promise<{ updated: number; skipped: number }> {
+  if (USE_API) return api.transactions.bulkUpdateTransactions(ids, patch);
   await simulateLatency(450);
   const category = patch.categoryId ? db.categories.find((c) => c.id === patch.categoryId) : undefined;
   let updated = 0;
@@ -283,6 +305,7 @@ export async function bulkUpdateTransactions(
  * khi đó trả về gợi ý tạo luật từ khoá. +5 XP, tính vào chuỗi ngày.
  */
 export async function reviewTransaction(id: string, categoryId?: string): Promise<ReviewResult> {
+  if (USE_API) return api.transactions.reviewTransaction(id, categoryId);
   await simulateLatency(300);
   const t = findOrThrow(id);
   const changed = !!categoryId && categoryId !== t.categoryId;
@@ -312,28 +335,6 @@ export async function reviewTransaction(id: string, categoryId?: string): Promis
 
 // ───────────── Ghi nhanh bằng câu tự nhiên (giả lập F07 + F08) ─────────────
 
-const KEYWORD_RULES: { keywords: string[]; categoryId: string }[] = [
-  { keywords: ["luong"], categoryId: "c-salary" },
-  { keywords: ["thuong"], categoryId: "c-bonus" },
-  { keywords: ["hoan tien", "ban do", "duoc cho", "me cho", "bo cho"], categoryId: "c-income-other" },
-  // Từ khoá ngắn có khoảng trắng hai bên để không khớp nhầm ("pho" ≠ "phong", "an" ≠ "Lan")
-  { keywords: [" pho ", " bun ", " com ", " an ", " banh mi", "ca phe", "cafe", " cf ", "tra sua", " lau ", " nuong", " xoi ", "highlands", "tra da"], categoryId: "c-food" },
-  { keywords: ["grab", "be bike", " xang", "taxi", "xe buyt", "gui xe", "ve tau", "xanh sm"], categoryId: "c-move" },
-  { keywords: [" sach", " hoc ", "khoa hoc", "ielts", "toeic", "giao trinh"], categoryId: "c-study" },
-  { keywords: [" phim", "cgv", "karaoke", " game", "netflix", "spotify", "ca nhac", "du lich"], categoryId: "c-fun" },
-  { keywords: ["shopee", "tiki", "lazada", " ao ", " quan ", " giay", "my pham", "uniqlo"], categoryId: "c-shop" },
-  { keywords: ["tien dien", "tien nuoc", "internet", "wifi", "tien nha", "tien phong", "cuoc dien thoai", " 4g"], categoryId: "c-bill" },
-  { keywords: ["thuoc", "kham", "gym", "nha khoa", "bao hiem", "pharmacity"], categoryId: "c-health" },
-];
-
-/** Gợi ý của "LLM" giả lập khi không luật nào khớp: đoán được nhưng chưa chắc (< 0,7 → chờ duyệt) */
-const LLM_GUESSES: { keywords: string[]; categoryId: string; confidence: number }[] = [
-  { keywords: ["winmart", "bach hoa", "bhx", "coopmart", "co op", "circle k", "familymart", "gs25"], categoryId: "c-food", confidence: 0.62 },
-  { keywords: ["guardian", "long chau", "an khang", "benh vien"], categoryId: "c-health", confidence: 0.64 },
-  { keywords: ["vexere", "vietjet", "vietnam airlines", "agoda", "traveloka", "booking"], categoryId: "c-fun", confidence: 0.58 },
-  { keywords: ["dien may", "the gioi di dong", "fpt shop", "cellphones"], categoryId: "c-shop", confidence: 0.6 },
-];
-
 export interface ClassifyResult {
   category: Category | null;
   confidence: number;
@@ -346,106 +347,29 @@ export interface ClassifyResult {
  * `type` (nếu biết, vd. từ dấu số tiền trong sao kê) loại bỏ danh mục khác loại thu/chi.
  */
 export function classifyDescription(text: string, type?: TransactionType): ClassifyResult {
-  const norm = ` ${normalize(text).replace(/[^a-z0-9]+/g, " ")} `;
-  const fits = (categoryId: string) => {
-    const c = db.categories.find((x) => x.id === categoryId);
-    return c && (!type || c.type === type) ? c : null;
-  };
-  // Luật người dùng chạy trước luật mặc định (F08: hybrid, luật trước rồi mới tới LLM)
-  const userRule = db.classificationRules.find((r) => matchesKeyword(text, r.keyword) && fits(r.categoryId));
-  if (userRule) return { category: fits(userRule.categoryId), confidence: 0.97, source: "rule" };
-  for (const r of KEYWORD_RULES) {
-    const c = fits(r.categoryId);
-    if (c && r.keywords.some((k) => norm.includes(k))) return { category: c, confidence: 0.95, source: "rule" };
-  }
-  for (const g of LLM_GUESSES) {
-    const c = fits(g.categoryId);
-    if (c && g.keywords.some((k) => norm.includes(k))) return { category: c, confidence: g.confidence, source: "llm" };
-  }
-  return { category: null, confidence: 0.45, source: "none" };
-}
-
-const INCOME_HINTS = ["luong", "thuong", "nhan ", "duoc cho", "hoan tien", "ban do", "thu "];
-
-function addDays(isoDate: string, delta: number): string {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d + delta));
-  return dt.toISOString().slice(0, 10);
-}
-
-function parseAmount(text: string): { amount: number | null; match: string | null } {
-  // "1tr2", "1,5tr", "45k", "45 nghìn", "200.000đ", "300000"
-  const patterns: [RegExp, (m: RegExpMatchArray) => number][] = [
-    [/(\d+)\s*(?:tr|triệu|củ)\s*(\d)(?!\d)/i, (m) => Number(m[1]) * 1e6 + Number(m[2]) * 1e5],
-    [/(\d+(?:[.,]\d+)?)\s*(?:tr|triệu|củ)\b/i, (m) => Number(m[1].replace(",", ".")) * 1e6],
-    [/(\d+(?:[.,]\d+)?)\s*(?:k|nghìn|ngàn|ng)\b/i, (m) => Number(m[1].replace(",", ".")) * 1e3],
-    [/(\d{1,3}(?:\.\d{3})+)\s*(?:đ|d|vnd)?/i, (m) => Number(m[1].replace(/\./g, ""))],
-    [/(\d{4,})\s*(?:đ|d|vnd)?/i, (m) => Number(m[1])],
-  ];
-  for (const [re, toNumber] of patterns) {
-    const m = text.match(re);
-    if (m) return { amount: Math.round(toNumber(m)), match: m[0] };
-  }
-  return { amount: null, match: null };
-}
-
-function parseDate(text: string): { date: string; match: string | null } {
-  const lower = text.toLowerCase();
-  const relative: [string, number][] = [
-    ["hôm kia", -2],
-    ["hôm qua", -1],
-    ["hôm nay", 0],
-  ];
-  for (const [phrase, delta] of relative) {
-    if (lower.includes(phrase)) return { date: addDays(db.MOCK_TODAY, delta), match: phrase };
-  }
-  const m = text.match(/(?:ngày\s*)?(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
-  if (m) {
-    const year = m[3] ?? db.MOCK_TODAY.slice(0, 4);
-    return { date: `${year}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`, match: m[0] };
-  }
-  return { date: db.MOCK_TODAY, match: null };
-}
-
-function cleanDescription(text: string, remove: (string | null)[]): string {
-  let out = text;
-  for (const r of remove) if (r) out = out.replace(new RegExp(r.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&"), "i"), " ");
-  out = out.replace(/\s+/g, " ").trim();
-  return out ? out.charAt(0).toUpperCase() + out.slice(1) : "";
+  return classifyByRules(text, { categories: db.categories, userRules: db.classificationRules }, { type, includeGuesses: true });
 }
 
 export async function parseQuickEntry(text: string): Promise<QuickEntryPreview> {
+  if (USE_API) return api.transactions.parseQuickEntry(text);
   await simulateLatency(700);
-  const { amount, match: amountMatch } = parseAmount(text);
-  const { date, match: dateMatch } = parseDate(text);
-  const norm = ` ${normalize(text).replace(/[^a-z0-9]+/g, " ")} `;
-  const inferredIncome = INCOME_HINTS.some((k) => norm.includes(k));
+  const parsed = parseQuickEntryText(text, db.MOCK_TODAY);
   const guess = classifyDescription(text);
-  const type: TransactionType = guess.category?.type ?? (inferredIncome ? "income" : "expense");
-
-  const walletId = norm.includes("momo")
-    ? "w-momo"
-    : norm.includes("vietcombank") || norm.includes("vcb")
-      ? "w-vcb"
-      : norm.includes("techcombank") || norm.includes("tcb")
-        ? "w-tcb"
-        : type === "income"
-          ? "w-vcb"
-          : "w-cash";
-
+  const type: TransactionType = guess.category?.type ?? parsed.type;
   return {
     rawText: text,
-    amount,
+    amount: parsed.amount,
     type,
-    date,
-    description: cleanDescription(text, [amountMatch, dateMatch]) || text,
+    date: parsed.date,
+    description: parsed.description,
     categoryId: guess.category?.id ?? (type === "income" ? "c-income-other" : "c-other"),
     confidence: guess.category ? guess.confidence : 0.55,
-    walletId,
+    walletId: guessWallet(text, scopedWallets(), type)?.id ?? "w-cash",
   };
 }
 
 export async function createFromQuickEntry(preview: QuickEntryPreview): Promise<QuickEntryResult> {
+  if (USE_API) return api.transactions.createFromQuickEntry(preview);
   await simulateLatency(400);
   if (!preview.amount || preview.amount <= 0) throw new Error("Số tiền chưa hợp lệ");
   const category = db.categories.find((c) => c.id === preview.categoryId)!;

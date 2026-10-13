@@ -22,14 +22,17 @@ import type {
   UserStreak,
   Wallet,
 } from "@/types";
+import { LEVEL_TITLES, STREAK_MILESTONES, computeStreaks } from "@shared/gamification-rules";
 
 /** Ngày "hôm nay" của bộ dữ liệu demo */
 export const MOCK_TODAY = "2026-10-12";
 export const USER_ID = "u-lan";
+/** Email cố định của Lan (db.user thay đổi khi kho dữ liệu nạp sổ của tài khoản khác) */
+export const LAN_EMAIL = "lan.nguyen@example.com";
 
 export const user: User = {
   id: USER_ID,
-  email: "lan.nguyen@example.com",
+  email: LAN_EMAIL,
   fullName: "Nguyễn Thị Lan",
   currency: "VND",
   timezone: "Asia/Ho_Chi_Minh",
@@ -326,20 +329,7 @@ export const activityLogs: ActivityLog[] = activity.logs;
 /** Ngày đã dùng thẻ đóng băng (giữ chuỗi, không tính là ngày ghi chép) */
 export const freezeDays: string[] = activity.frozen;
 
-/**
- * Tính chuỗi hiện tại và kỷ lục từ nhật ký: ngày có hoạt động +1, ngày đóng băng giữ nguyên,
- * ngày trống làm chuỗi về 0. Chuỗi hiện tại tính đến `until` (hôm qua nếu hôm nay chưa ghi).
- */
-export function computeStreaks(activeDates: Set<string>, frozenDates: Set<string>, from: string, until: string) {
-  let current = 0;
-  let longest = 0;
-  for (let d = from; d <= until; d = addDaysIso(d, 1)) {
-    if (activeDates.has(d)) current += 1;
-    else if (!frozenDates.has(d)) current = 0;
-    longest = Math.max(longest, current);
-  }
-  return { current, longest };
-}
+export { computeStreaks };
 
 const initialStreaks = computeStreaks(
   new Set(activityLogs.map((l) => l.date)),
@@ -359,21 +349,7 @@ export const streak: UserStreak = {
 /** Cấp 5 = 1.400 XP tích luỹ; +120 XP trong cấp hiện tại */
 export const level: UserLevel = { userId: USER_ID, totalXp: 1_520, level: 5 };
 
-export const LEVEL_TITLES: Record<number, string> = {
-  1: "Người mới ghi sổ",
-  2: "Người ghi chép",
-  3: "Người tập tiết kiệm",
-  4: "Người giữ nhịp",
-  5: "Thủ quỹ chăm chỉ",
-  6: "Thủ quỹ đáng tin",
-  7: "Người lập kế hoạch",
-  8: "Chuyên gia ngân sách",
-  9: "Nhà quản lý tài chính",
-  10: "Bậc thầy chi tiêu",
-};
-
-/** Mốc chuỗi → XP thưởng (PRD §6.2, §6.4) */
-export const STREAK_MILESTONES: Record<number, number> = { 3: 50, 7: 100, 14: 150, 30: 300, 60: 400, 100: 500 };
+export { LEVEL_TITLES, STREAK_MILESTONES };
 
 export const missions: Mission[] = [
   { id: "m-d-3tx", code: "DAILY_3_TX", title: "Ghi ít nhất 3 giao dịch", period: "daily", target: 3, xp: 20 },

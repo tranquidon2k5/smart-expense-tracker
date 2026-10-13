@@ -109,7 +109,8 @@ export function clearCurrentDataset(): void {
 }
 
 // Tải lại trang khi đang đăng nhập tài khoản khác Lan → nạp ngay sổ của tài khoản đó
-if (typeof window !== "undefined") {
+// (Bản api không dùng kho mock: dữ liệu và phiên đến từ backend)
+if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_DATA_SOURCE !== "api") {
   const s = getStoredSession();
   const account = s ? findAccount(s.userId) : undefined;
   if (account && account.user.id !== db.USER_ID) loadDatasetFor(account.user);

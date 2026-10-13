@@ -5,7 +5,6 @@ import type {
   Badge,
   Category,
   Mission,
-  MotivationContext,
   MotivationMessage,
   SystemStats,
 } from "@/types";
@@ -15,18 +14,27 @@ import { categoryUsage } from "./mock/dataset";
 import { failIfErrorScenario, simulateLatency } from "./mock/scenario";
 import { getStoredSession } from "./mock/session-store";
 import { emitDataChanged } from "./events";
+import { ForbiddenError } from "./errors";
+
+export { ForbiddenError };
+import {
+  AI_FEATURE_LABEL,
+  MOTIVATION_CONTEXTS,
+  MOTIVATION_VARIABLES,
+  missionCode,
+  missionError,
+  motivationError,
+  previewTemplate,
+  unknownVariables,
+} from "@shared/admin-rules";
+import { USE_API } from "./data-source";
+import * as api from "./api/endpoints";
 
 /**
  * Trang quản trị (F15). Mọi hàm kiểm tra vai trò admin trước (bản thật: middleware backend
  * kiểm tra role trong JWT; giao diện ẩn trang chỉ là lớp thứ hai).
  */
 
-export class ForbiddenError extends Error {
-  constructor() {
-    super("Bạn không có quyền truy cập trang quản trị.");
-    this.name = "ForbiddenError";
-  }
-}
 
 function requireAdmin() {
   const s = getStoredSession();
@@ -44,9 +52,10 @@ const nextId = (p: string) => `${p}-${Date.now().toString(36)}`;
 
 // ───────────── Thống kê hệ thống ─────────────
 
-export const AI_FEATURE_LABEL = { extract: "Trích xuất câu", classify: "Phân loại", chat: "Trợ lý AI", motivation: "Câu khích lệ" } as const;
+export { AI_FEATURE_LABEL };
 
 export async function getSystemStats(): Promise<SystemStats> {
+  if (USE_API) return api.admin.getSystemStats();
   await guard(500);
   const users = accounts.filter((a) => a.user.role === "user");
   const since = (days: number) => {
@@ -84,6 +93,7 @@ export async function getSystemStats(): Promise<SystemStats> {
 // ───────────── Người dùng ─────────────
 
 export async function listUsers(): Promise<AdminUserRow[]> {
+  if (USE_API) return api.admin.listUsers();
   await guard(450);
   return accounts
     .map((a) => ({ ...a.user, ...a.stats }))
@@ -91,6 +101,7 @@ export async function listUsers(): Promise<AdminUserRow[]> {
 }
 
 export async function setUserLocked(userId: string, locked: boolean): Promise<AdminUserRow> {
+  if (USE_API) return api.admin.setUserLocked(userId, locked);
   const me = await guard(400);
   const account = accounts.find((a) => a.user.id === userId);
   if (!account) throw new Error("Không tìm thấy người dùng.");
@@ -105,6 +116,7 @@ export async function setUserLocked(userId: string, locked: boolean): Promise<Ad
 // ───────────── Danh mục mặc định ─────────────
 
 export async function listDefaultCategories(): Promise<AdminCategoryRow[]> {
+  if (USE_API) return api.admin.listDefaultCategories();
   await guard();
   return db.categories
     .filter((c) => c.userId === null)
@@ -112,6 +124,7 @@ export async function listDefaultCategories(): Promise<AdminCategoryRow[]> {
 }
 
 export async function saveDefaultCategory(input: Omit<Category, "id" | "userId"> & { id?: string }): Promise<Category> {
+  if (USE_API) return api.admin.saveDefaultCategory(input);
   await guard(400);
   const name = input.name.trim();
   if (name.length < 2) throw new Error("Tên danh mục cần ít nhất 2 ký tự.");
@@ -137,6 +150,7 @@ export async function saveDefaultCategory(input: Omit<Category, "id" | "userId">
 }
 
 export async function deleteDefaultCategory(id: string): Promise<void> {
+  if (USE_API) return api.admin.deleteDefaultCategory(id);
   await guard(400);
   const usage = categoryUsage(id);
   if (usage) throw new Error(`Danh mục đang được dùng cho ${usage} giao dịch nên không xoá được. Bạn có thể đổi tên thay vì xoá.`);
@@ -148,46 +162,20 @@ export async function deleteDefaultCategory(id: string): Promise<void> {
 
 // ───────────── Ngân hàng câu khích lệ ─────────────
 
-export const MOTIVATION_CONTEXTS: { value: MotivationContext; label: string; when: string }[] = [
-  { value: "morning", label: "Chào buổi sáng", when: "Lần đăng nhập đầu tiên trong ngày" },
-  { value: "after_transaction", label: "Sau khi ghi giao dịch", when: "Ngay khi lưu thành công" },
-  { value: "streak_at_risk", label: "Sắp mất chuỗi", when: "Giờ nhắc (mặc định 20:00) nếu hôm nay chưa ghi" },
-  { value: "streak_milestone", label: "Đạt mốc chuỗi", when: "Khi chạm mốc 3, 7, 14, 30…" },
-  { value: "streak_lost", label: "Mất chuỗi", when: "Lần đăng nhập sau khi mất chuỗi" },
-  { value: "welcome_back", label: "Quay lại sau thời gian dài", when: "Không đăng nhập từ 7 ngày" },
-  { value: "budget_good", label: "Ngân sách tốt", when: "Cuối tuần, chi dưới 80% ngân sách" },
-  { value: "first_day", label: "Ngày đầu tiên", when: "Tài khoản mới, chưa có giao dịch" },
-];
-
-/** Biến được phép chèn vào câu (PRD §6.3) */
-export const MOTIVATION_VARIABLES = [
-  { key: "{name}", label: "Tên", sample: "Lan" },
-  { key: "{streak}", label: "Số ngày chuỗi", sample: "12" },
-  { key: "{longest}", label: "Kỷ lục chuỗi", sample: "15" },
-  { key: "{amount}", label: "Số tiền", sample: "45.000đ" },
-] as const;
-
-export function unknownVariables(template: string): string[] {
-  const allowed = new Set<string>(MOTIVATION_VARIABLES.map((v) => v.key));
-  return [...new Set(template.match(/\{[^}]*\}/g) ?? [])].filter((v) => !allowed.has(v));
-}
-
-export function previewTemplate(template: string): string {
-  return MOTIVATION_VARIABLES.reduce((s, v) => s.split(v.key).join(v.sample), template);
-}
+export { MOTIVATION_CONTEXTS, MOTIVATION_VARIABLES, previewTemplate, unknownVariables };
 
 export async function listMotivationMessages(): Promise<MotivationMessage[]> {
+  if (USE_API) return api.admin.listMotivationMessages();
   await guard();
   return db.motivationMessages.map((m) => ({ ...m }));
 }
 
 export async function saveMotivationMessage(input: Omit<MotivationMessage, "id"> & { id?: string }): Promise<MotivationMessage> {
+  if (USE_API) return api.admin.saveMotivationMessage(input);
   await guard(400);
   const template = input.template.trim();
-  if (template.length < 10) throw new Error("Câu khích lệ cần ít nhất 10 ký tự.");
-  if (template.length > 200) throw new Error("Câu khích lệ tối đa 200 ký tự để hiển thị gọn.");
-  const bad = unknownVariables(template);
-  if (bad.length) throw new Error(`Biến không hỗ trợ: ${bad.join(", ")}.`);
+  const invalid = motivationError(template);
+  if (invalid) throw new Error(invalid);
   if (input.id) {
     const m = db.motivationMessages.find((x) => x.id === input.id);
     if (!m) throw new Error("Không tìm thấy câu.");
@@ -213,6 +201,7 @@ function ensureContextKeepsActive(m: MotivationMessage, staysActiveHere: boolean
 }
 
 export async function setMotivationActive(id: string, isActive: boolean): Promise<void> {
+  if (USE_API) return api.admin.setMotivationActive(id, isActive);
   await guard(250);
   const m = db.motivationMessages.find((x) => x.id === id);
   if (!m) throw new Error("Không tìm thấy câu.");
@@ -222,6 +211,7 @@ export async function setMotivationActive(id: string, isActive: boolean): Promis
 }
 
 export async function deleteMotivationMessage(id: string): Promise<void> {
+  if (USE_API) return api.admin.deleteMotivationMessage(id);
   await guard(300);
   const m = db.motivationMessages.find((x) => x.id === id);
   if (!m) return;
@@ -233,20 +223,17 @@ export async function deleteMotivationMessage(id: string): Promise<void> {
 // ───────────── Nhiệm vụ ─────────────
 
 export async function listMissions(): Promise<Mission[]> {
+  if (USE_API) return api.admin.listMissions();
   await guard();
   return db.missions.map((m) => ({ ...m, isActive: m.isActive ?? true }));
 }
 
 export async function saveMission(input: Omit<Mission, "id" | "code"> & { id?: string; code?: string }): Promise<Mission> {
+  if (USE_API) return api.admin.saveMission(input);
   await guard(400);
   const title = input.title.trim();
-  if (title.length < 5) throw new Error("Tên nhiệm vụ cần ít nhất 5 ký tự.");
-  if (!Number.isInteger(input.target) || input.target < 1 || input.target > 100) throw new Error("Mục tiêu là số nguyên từ 1 đến 100.");
-  // Giới hạn XP theo PRD §6.4: nhiệm vụ ngày ~20 XP, tuần ~100 XP
-  const maxXp = input.period === "daily" ? 50 : 200;
-  if (!Number.isInteger(input.xp) || input.xp < 5 || input.xp > maxXp) {
-    throw new Error(`XP của nhiệm vụ ${input.period === "daily" ? "ngày" : "tuần"} trong khoảng 5–${maxXp}.`);
-  }
+  const invalid = missionError(input);
+  if (invalid) throw new Error(invalid);
   if (input.id) {
     const m = db.missions.find((x) => x.id === input.id);
     if (!m) throw new Error("Không tìm thấy nhiệm vụ.");
@@ -255,14 +242,7 @@ export async function saveMission(input: Omit<Mission, "id" | "code"> & { id?: s
     emitDataChanged();
     return { ...m };
   }
-  const code = (input.code?.trim() || title)
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/gi, "D")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")
-    .replace(/^_|_$/g, "")
-    .slice(0, 32);
+  const code = missionCode(input.code?.trim() || title);
   if (db.missions.some((m) => m.code === code)) throw new Error(`Mã ${code} đã tồn tại.`);
   const m: Mission = { id: nextId("m"), code, title, period: input.period, target: input.target, xp: input.xp, isActive: input.isActive ?? true };
   db.missions.push(m);
@@ -273,6 +253,7 @@ export async function saveMission(input: Omit<Mission, "id" | "code"> & { id?: s
 // ───────────── Huy hiệu ─────────────
 
 export async function listBadges(): Promise<AdminBadgeRow[]> {
+  if (USE_API) return api.admin.listBadges();
   await guard();
   const users = accounts.filter((a) => a.user.role === "user");
   return db.badges.map((b, i) => {
@@ -301,6 +282,7 @@ export async function listBadges(): Promise<AdminBadgeRow[]> {
 
 /** Điều kiện mở khoá gắn với mã huy hiệu trong code → admin chỉ sửa tên, mô tả, icon */
 export async function saveBadge(input: Pick<Badge, "id" | "name" | "condition" | "icon">): Promise<Badge> {
+  if (USE_API) return api.admin.saveBadge(input);
   await guard(400);
   const b = db.badges.find((x) => x.id === input.id);
   if (!b) throw new Error("Không tìm thấy huy hiệu.");

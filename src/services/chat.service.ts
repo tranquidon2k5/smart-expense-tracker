@@ -5,17 +5,16 @@ import { bumpMission, evaluateBadges, scopedTransactions, toView } from "./mock/
 import { dataset } from "./mock/dataset";
 import { failIfErrorScenario, getScenario, simulateLatency } from "./mock/scenario";
 import { emitDataChanged } from "./events";
+import { ChatTimeoutError } from "./errors";
+import { USE_API } from "./data-source";
+import * as api from "./api/endpoints";
+
+export { ChatTimeoutError };
 
 /** PRD §8: chatbot phản hồi dưới 5 giây — quá thì báo lỗi để người dùng thử lại */
 export const CHAT_TIMEOUT_MS = 5000;
 export const QUESTION_MAX_LENGTH = 300;
 
-export class ChatTimeoutError extends Error {
-  constructor() {
-    super("Trợ lý trả lời quá 5 giây. Có thể mạng đang chậm, bạn thử lại nhé.");
-    this.name = "ChatTimeoutError";
-  }
-}
 
 export { SUGGESTED_QUESTIONS };
 
@@ -79,12 +78,14 @@ function summarize(c: Conversation): ConversationSummary {
 }
 
 export async function listConversations(): Promise<ConversationSummary[]> {
+  if (USE_API) return api.chat.listConversations();
   await simulateLatency(300);
   failIfErrorScenario();
   return [...store()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(summarize);
 }
 
 export async function getConversation(id: string): Promise<Conversation | null> {
+  if (USE_API) return api.chat.getConversation(id);
   await simulateLatency(250);
   failIfErrorScenario();
   const c = store().find((x) => x.id === id);
@@ -93,6 +94,7 @@ export async function getConversation(id: string): Promise<Conversation | null> 
 
 /** Giao dịch nguồn của một câu trả lời (bỏ qua giao dịch đã bị xoá sau đó) */
 export async function getSources(ids: string[]): Promise<TransactionView[]> {
+  if (USE_API) return api.chat.getSources(ids);
   await simulateLatency(200);
   const byId = new Map(scopedTransactions().map((t) => [t.id, t]));
   return ids.flatMap((id) => {
@@ -112,6 +114,7 @@ function titleFrom(question: string) {
  * Câu hỏi trong phạm vi được tính vào nhiệm vụ "Hỏi trợ lý AI 1 câu" và huy hiệu "Trò chuyện cùng AI".
  */
 export async function ask(conversationId: string | null, question: string): Promise<AskResult> {
+  if (USE_API) return api.chat.ask(conversationId, question);
   const text = question.trim();
   if (!text) throw new Error("Nhập câu hỏi trước khi gửi nhé.");
   if (text.length > QUESTION_MAX_LENGTH) throw new Error(`Câu hỏi tối đa ${QUESTION_MAX_LENGTH} ký tự.`);
@@ -148,6 +151,7 @@ export async function ask(conversationId: string | null, question: string): Prom
 }
 
 export async function deleteConversation(id: string): Promise<void> {
+  if (USE_API) return api.chat.deleteConversation(id);
   await simulateLatency(250);
   const list = store();
   const i = list.findIndex((c) => c.id === id);

@@ -16,50 +16,27 @@ import { loadDatasetFor } from "./mock/dataset";
 import { simulateLatency } from "./mock/scenario";
 import { getStoredSession, setStoredSession, subscribeSession } from "./mock/session-store";
 import { emitDataChanged } from "./events";
+import { AuthError } from "./errors";
+
+export { AuthError };
+import { PASSWORD_MIN, passwordChecks, validateEmail, validatePassword } from "@shared/validation";
+import { USE_API } from "./data-source";
+import { getApiSession, subscribeApiSession } from "./api/session";
+import * as api from "./api/endpoints";
 
 export { DEMO_RESET_CODE };
 
+/** Bản mock hiện sẵn mã đặt lại trên màn hình; bản api gửi mã thật qua email (dev: Mailpit) */
+export const RESET_CODE_HINT: string | null = USE_API ? null : DEMO_RESET_CODE;
+
 /** Tài khoản demo hiển thị ở trang Đăng nhập */
 export const DEMO_ACCOUNTS = [
-  { label: "Người dùng (Lan)", email: db.user.email, password: DEMO_PASSWORD },
+  { label: "Người dùng (Lan)", email: db.LAN_EMAIL, password: DEMO_PASSWORD },
   { label: "Quản trị viên", email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
 ] as const;
 
-export const PASSWORD_MIN = 8;
 
-/** Lỗi có thể chỉ ra ô nhập gây lỗi để giao diện đặt thông báo ngay dưới ô đó */
-export class AuthError extends Error {
-  constructor(
-    message: string,
-    public field?: "email" | "password" | "currentPassword" | "code" | "fullName",
-  ) {
-    super(message);
-    this.name = "AuthError";
-  }
-}
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export function validateEmail(email: string): string | null {
-  if (!email.trim()) return "Nhập email của bạn";
-  if (!EMAIL_RE.test(email.trim())) return "Email chưa đúng định dạng, ví dụ ten@example.com";
-  return null;
-}
-
-/** Quy tắc mật khẩu: ≥ 8 ký tự, có cả chữ và số. Trả từng điều kiện để giao diện hiện danh sách kiểm tra. */
-export function passwordChecks(password: string) {
-  return [
-    { label: `Ít nhất ${PASSWORD_MIN} ký tự`, ok: password.length >= PASSWORD_MIN },
-    { label: "Có chữ cái", ok: /\p{L}/u.test(password) },
-    { label: "Có chữ số", ok: /\d/.test(password) },
-  ];
-}
-
-export function validatePassword(password: string): string | null {
-  if (!password) return "Nhập mật khẩu";
-  const failed = passwordChecks(password).find((c) => !c.ok);
-  return failed ? `Mật khẩu cần: ${failed.label.toLowerCase()}` : null;
-}
+export { PASSWORD_MIN, passwordChecks, validateEmail, validatePassword };
 
 function toSession(user: User): AuthSession {
   return { userId: user.id, role: user.role, email: user.email, fullName: user.fullName };
@@ -75,11 +52,11 @@ function signIn(user: User): AuthSession {
 
 // ───────────── Phiên ─────────────
 
-export function getSession(): AuthSession | null {
-  return getStoredSession();
+export function getSession(): AuthSession | null | undefined {
+  return USE_API ? getApiSession() : getStoredSession();
 }
 
-export const onSessionChanged = subscribeSession;
+export const onSessionChanged = USE_API ? subscribeApiSession : subscribeSession;
 
 export function homeFor(session: AuthSession): string {
   return session.role === "admin" ? "/quan-tri" : "/";
@@ -97,6 +74,7 @@ export function safeNext(next: string | null, session: AuthSession): string {
 // ───────────── Đăng nhập / đăng ký / đăng xuất ─────────────
 
 export async function login(email: string, password: string): Promise<AuthSession> {
+  if (USE_API) return api.auth.login(email, password);
   await simulateLatency(600);
   const account = findAccountByEmail(email);
   // Không nói rõ sai email hay sai mật khẩu để không lộ email nào đã đăng ký
@@ -110,6 +88,7 @@ export async function login(email: string, password: string): Promise<AuthSessio
 }
 
 export async function register(input: RegisterInput): Promise<AuthSession> {
+  if (USE_API) return api.auth.register(input);
   await simulateLatency(700);
   const fullName = input.fullName.trim().replace(/\s+/g, " ");
   if (fullName.length < 2) throw new AuthError("Nhập họ tên của bạn", "fullName");
@@ -141,6 +120,7 @@ export async function register(input: RegisterInput): Promise<AuthSession> {
 }
 
 export async function logout(): Promise<void> {
+  if (USE_API) return api.auth.logout();
   setStoredSession(null);
 }
 
@@ -148,6 +128,7 @@ export async function logout(): Promise<void> {
 
 /** Bước 1: gửi mã đặt lại. Luôn báo thành công dù email có tồn tại hay không (không lộ tài khoản). */
 export async function requestPasswordReset(email: string): Promise<void> {
+  if (USE_API) return api.auth.requestPasswordReset(email);
   await simulateLatency(700);
   const emailError = validateEmail(email);
   if (emailError) throw new AuthError(emailError, "email");
@@ -155,6 +136,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
 
 /** Bước 2: nhập mã + mật khẩu mới */
 export async function resetPassword(email: string, code: string, newPassword: string): Promise<void> {
+  if (USE_API) return api.auth.resetPassword(email, code, newPassword);
   await simulateLatency(700);
   const account = findAccountByEmail(email);
   if (!/^\d{6}$/.test(code.trim())) throw new AuthError("Mã gồm 6 chữ số", "code");
@@ -169,6 +151,7 @@ export async function resetPassword(email: string, code: string, newPassword: st
 }
 
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  if (USE_API) return api.auth.changePassword(currentPassword, newPassword);
   await simulateLatency(600);
   const session = getStoredSession();
   const account = session ? findAccount(session.userId) : undefined;

@@ -4,6 +4,8 @@ import { scopedTransactions, scopedWallets } from "./mock/queries";
 import { failIfErrorScenario, getScenario, simulateLatency } from "./mock/scenario";
 import { emitDataChanged } from "./events";
 import { formatMoney } from "@/lib/format";
+import { USE_API } from "./data-source";
+import * as api from "./api/endpoints";
 
 const CURRENT_MONTH = db.MOCK_TODAY.slice(0, 7);
 
@@ -21,6 +23,7 @@ function toTransferView(t: WalletTransfer): TransferView {
 
 /** Các ví kèm số dư và thu/chi tháng này (F02) */
 export async function listWalletSummaries(): Promise<WalletSummary[]> {
+  if (USE_API) return api.wallets.listWalletSummaries();
   await simulateLatency(400);
   failIfErrorScenario();
   const txs = scopedTransactions().filter((t) => t.status === "confirmed");
@@ -38,6 +41,7 @@ export async function listWalletSummaries(): Promise<WalletSummary[]> {
 
 /** Lịch sử chuyển tiền, mới nhất trước; lọc theo ví nếu có */
 export async function listTransfers(walletId?: string, limit = 20): Promise<TransferView[]> {
+  if (USE_API) return api.wallets.listTransfers(walletId, limit);
   await simulateLatency(300);
   failIfErrorScenario();
   return scopedTransfers()
@@ -62,6 +66,7 @@ export function validateTransfer(input: TransferInput, today = db.MOCK_TODAY): s
 
 /** Chuyển tiền giữa hai ví: trừ ví chuyển, cộng ví nhận, không tạo khoản thu/chi */
 export async function transfer(input: TransferInput): Promise<TransferView> {
+  if (USE_API) return api.wallets.transfer(input);
   await simulateLatency(450);
   const error = validateTransfer(input);
   if (error) throw new Error(error);

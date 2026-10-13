@@ -123,12 +123,14 @@ export function ForgotPasswordForm() {
               Nếu <span className="font-medium text-foreground">{email}</span> đã đăng ký, mã 6 số vừa được gửi tới hộp thư. Mã có hiệu lực 15 phút.
             </p>
           </div>
-          <FormAlert tone="info">
-            <span className="flex items-center gap-1.5">
-              <MailCheck aria-hidden className="size-4 text-info" /> Bản demo không gửi email thật: mã là{" "}
-              <span className="num font-semibold">{authService.DEMO_RESET_CODE}</span>
-            </span>
-          </FormAlert>
+          {authService.RESET_CODE_HINT && (
+            <FormAlert tone="info">
+              <span className="flex items-center gap-1.5">
+                <MailCheck aria-hidden className="size-4 text-info" /> Bản demo không gửi email thật: mã là{" "}
+                <span className="num font-semibold">{authService.RESET_CODE_HINT}</span>
+              </span>
+            </FormAlert>
+          )}
           <form noValidate onSubmit={reset} className="flex flex-col gap-4">
             <FormField label="Mã xác nhận" error={errors.code}>
               {(p) => (

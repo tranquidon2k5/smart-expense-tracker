@@ -2,16 +2,20 @@ import type { BudgetProgress, CategoryBreakdown, DashboardSummary, MonthlyTrendP
 import * as db from "./mock/db";
 import { getScenario, simulateLatency } from "./mock/scenario";
 import { buildBreakdown, confirmedTransactions, scopedTransactions, scopedWallets, shiftMonth, sumTotals } from "./mock/queries";
+import { USE_API } from "./data-source";
+import { getToday } from "./transaction.service";
+import * as api from "./api/endpoints";
 
 const CURRENT_MONTH = db.MOCK_TODAY.slice(0, 7);
 const confirmed = confirmedTransactions;
 const totals = sumTotals;
 
 export function getCurrentMonth(): string {
-  return CURRENT_MONTH;
+  return USE_API ? getToday().slice(0, 7) : CURRENT_MONTH;
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
+  if (USE_API) return api.dashboard.getDashboardSummary();
   await simulateLatency();
   const all = confirmed();
   const day = db.MOCK_TODAY.slice(8, 10);
@@ -45,6 +49,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
 
 /** Thu/chi theo tháng, `months` tháng gần nhất (tính cả tháng hiện tại) */
 export async function getMonthlyTrend(months = 6): Promise<MonthlyTrendPoint[]> {
+  if (USE_API) return api.dashboard.getMonthlyTrend(months);
   await simulateLatency();
   const all = confirmed();
   const points: MonthlyTrendPoint[] = [];
@@ -59,6 +64,7 @@ export async function getMonthlyTrend(months = 6): Promise<MonthlyTrendPoint[]> 
 
 /** Cơ cấu chi theo danh mục: tối đa 4 lát + "Khác" (MASTER.md › Charts) */
 export async function getCategoryBreakdown(maxSlices = 5): Promise<CategoryBreakdown> {
+  if (USE_API) return api.dashboard.getCategoryBreakdown(maxSlices);
   await simulateLatency();
   const expenses = confirmed().filter((t) => t.type === "expense" && t.date.startsWith(CURRENT_MONTH));
   return buildBreakdown(expenses, CURRENT_MONTH, maxSlices);
@@ -66,6 +72,7 @@ export async function getCategoryBreakdown(maxSlices = 5): Promise<CategoryBreak
 
 /** Ngân sách tháng này, sắp xếp theo mức dùng giảm dần */
 export async function getBudgetWatchlist(limit = 4): Promise<BudgetProgress[]> {
+  if (USE_API) return api.dashboard.getBudgetWatchlist(limit);
   await simulateLatency();
   if (getScenario() === "empty") return [];
   const all = confirmed();
@@ -87,6 +94,7 @@ export async function getBudgetWatchlist(limit = 4): Promise<BudgetProgress[]> {
 }
 
 export async function getPendingCount(): Promise<number> {
+  if (USE_API) return api.dashboard.getPendingCount();
   await simulateLatency(200);
   return scopedTransactions().filter((t) => t.status === "pending").length;
 }

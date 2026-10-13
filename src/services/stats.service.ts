@@ -11,6 +11,9 @@ import {
   sumTotals,
   toView,
 } from "./mock/queries";
+import { USE_API } from "./data-source";
+import { getToday } from "./transaction.service";
+import * as api from "./api/endpoints";
 
 /**
  * Thống kê (F06) tính trên đúng tập dữ liệu của trang Tổng quan: chỉ giao dịch đã xác nhận,
@@ -20,11 +23,12 @@ import {
 const CURRENT_MONTH = db.MOCK_TODAY.slice(0, 7);
 
 export function getCurrentMonth(): string {
-  return CURRENT_MONTH;
+  return USE_API ? getToday().slice(0, 7) : CURRENT_MONTH;
 }
 
 /** Khoảng tháng có thể chọn: từ tháng có giao dịch đầu tiên tới tháng hiện tại */
 export async function getAvailableMonths(): Promise<string[]> {
+  if (USE_API) return api.stats.getAvailableMonths();
   await simulateLatency(150);
   failIfErrorScenario();
   const first = scopedTransactions().reduce((min, t) => (t.date < min ? t.date : min), db.MOCK_TODAY).slice(0, 7);
@@ -33,7 +37,8 @@ export async function getAvailableMonths(): Promise<string[]> {
 
 /** Khoảng mặc định: 6 tháng gần nhất (giống biểu đồ xu hướng ở Tổng quan) */
 export function defaultRange(): StatsRange {
-  return { from: shiftMonth(CURRENT_MONTH, -5), to: CURRENT_MONTH };
+  const current = getCurrentMonth();
+  return { from: shiftMonth(current, -5), to: current };
 }
 
 function normalizeRange(range: StatsRange): StatsRange {
@@ -47,6 +52,7 @@ function normalizeRange(range: StatsRange): StatsRange {
 }
 
 export async function getStatistics(input: StatsRange): Promise<StatsOverview> {
+  if (USE_API) return api.stats.getStatistics(input);
   await simulateLatency(550);
   failIfErrorScenario();
   const range = normalizeRange(input);
@@ -73,6 +79,7 @@ export async function getStatistics(input: StatsRange): Promise<StatsOverview> {
 
 /** So sánh chi theo danh mục giữa hai tháng: 5 danh mục lớn nhất (tính cả hai tháng) + "Khác" */
 export async function compareMonths(monthA: string, monthB: string, maxRows = 5): Promise<MonthComparison> {
+  if (USE_API) return api.stats.compareMonths(monthA, monthB);
   await simulateLatency(450);
   failIfErrorScenario();
   const all = confirmedTransactions();

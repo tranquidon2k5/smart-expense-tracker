@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/**/*",
+    "../shared/**/*",
+    "generated/**/*",
+    "scripts/run-jobs.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "prisma",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "../shared/**/*.test.ts"
+  ]
+}

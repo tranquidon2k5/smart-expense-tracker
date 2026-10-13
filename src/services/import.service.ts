@@ -5,6 +5,8 @@ import { applyToWallet, evaluateBadges, recordActivity, scopedTransactions, scop
 import { emitDataChanged } from "./events";
 import { CSV_MAX_BYTES, CsvFormatError, checkRows, mappingErrors, parseCsvText, splitDuplicates } from "./csv-import";
 import { CONFIDENCE_THRESHOLD, classifyDescription } from "./transaction.service";
+import { USE_API } from "./data-source";
+import * as api from "./api/endpoints";
 
 export { CsvFormatError, checkRows, guessMapping, mappingErrors, FIELD_LABEL, IMPORT_FIELDS } from "./csv-import";
 
@@ -63,6 +65,7 @@ export async function readSampleFile(href: string): Promise<ParsedCsv> {
  * Độ tin cậy ≥ 0,7 ghi thẳng, thấp hơn vào hàng chờ duyệt. Dòng lỗi được bỏ qua và trả về để hiển thị.
  */
 export async function importTransactions(req: ImportRequest): Promise<ImportResult> {
+  if (USE_API) return api.importer.importTransactions(req);
   await simulateLatency(900);
   failIfErrorScenario();
   const missing = Object.values(mappingErrors(req.mapping));

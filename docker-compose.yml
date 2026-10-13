@@ -1,0 +1,77 @@
+# Môi trường dev Sổ Tiền: Postgres + API (NestJS) + Mailpit. Next.js chạy trên máy (npm run dev).
+#   docker compose up -d
+#   cd server && npx prisma migrate deploy && npx prisma db seed
+name: so-tien
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sotien
+      POSTGRES_PASSWORD: sotien
+      POSTGRES_DB: sotien
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sotien -d sotien"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Database riêng cho test e2e (dữ liệu nằm trong RAM, xoá khi dừng)
+  db-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sotien
+      POSTGRES_PASSWORD: sotien
+      POSTGRES_DB: sotien_test
+    ports:
+      - "5434:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sotien -d sotien_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    profiles: ["test"]
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "8025:8025" # giao diện xem email: http://localhost:8025
+      - "1025:1025" # SMTP
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+      target: dev
+    env_file:
+      - path: server/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://sotien:sotien@postgres:5432/sotien
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      PORT: "3001"
+      # Bộ theo dõi file trên ổ Windows mount vào container cần polling
+      CHOKIDAR_USEPOLLING: "true"
+      TSC_WATCHFILE: DynamicPriorityPolling
+      TSC_WATCHDIRECTORY: DynamicPriorityPolling
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./server/src:/app/server/src
+      - ./server/prisma:/app/server/prisma
+      - ./shared:/app/shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+volumes:
+  pgdata:

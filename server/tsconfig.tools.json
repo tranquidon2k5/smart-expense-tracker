@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "paths": {
+      "@shared/*": [
+        "../shared/*"
+      ],
+      "@/*": [
+        "../src/*"
+      ]
+    },
+    "noEmit": true,
+    "incremental": false,
+    "module": "esnext",
+    "moduleResolution": "bundler"
+  },
+  "include": [
+    "prisma/seed.ts",
+    "prisma/seed-data.ts",
+    "test/**/*",
+    "scripts/**/*",
+    "src/**/*.spec.ts",
+    "../shared/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "../shared/**/*.test.ts"
+  ]
+}

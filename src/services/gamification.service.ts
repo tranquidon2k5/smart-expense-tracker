@@ -10,6 +10,8 @@ import type {
 import * as db from "./mock/db";
 import { badgeProgress, levelFromXp } from "./mock/queries";
 import { failIfErrorScenario, getScenario, simulateLatency } from "./mock/scenario";
+import { USE_API } from "./data-source";
+import * as api from "./api/endpoints";
 
 /** Số tuần hiển thị trên lịch nhiệt (≈ 6 tháng, khớp thời gian dùng app của bản demo) */
 export const HEATMAP_WEEKS = 26;
@@ -27,11 +29,13 @@ function mondayOf(iso: string): string {
 }
 
 export async function getCurrentUser(): Promise<User> {
+  if (USE_API) return api.gamification.getCurrentUser();
   await simulateLatency(150);
   return db.user;
 }
 
 export async function getGamificationStatus(): Promise<GamificationStatus> {
+  if (USE_API) return api.gamification.getGamificationStatus();
   await simulateLatency(300);
   return statusNow();
 }
@@ -64,6 +68,7 @@ function missionsOf(period: MissionPeriod): MissionProgress[] {
 }
 
 export async function getTodayMissions(): Promise<MissionProgress[]> {
+  if (USE_API) return api.gamification.getTodayMissions();
   await simulateLatency();
   return missionsOf("daily");
 }
@@ -84,6 +89,7 @@ function activityDays(): ActivityDay[] {
 
 /** Toàn bộ trang Thành tích: chuỗi, cấp độ, lịch nhiệt, nhiệm vụ, huy hiệu (F11–F14) */
 export async function getAchievements(): Promise<AchievementsOverview> {
+  if (USE_API) return api.gamification.getAchievements();
   await simulateLatency(450);
   failIfErrorScenario();
   const status = await statusNow();
@@ -115,6 +121,7 @@ export async function getAchievements(): Promise<AchievementsOverview> {
 
 /** Chọn câu khích lệ theo ngữ cảnh và chèn biến (PRD §6.3) */
 export async function getMotivation(): Promise<string> {
+  if (USE_API) return api.gamification.getMotivation();
   await simulateLatency(300);
   const empty = getScenario() === "empty";
   const context: MotivationContext = empty

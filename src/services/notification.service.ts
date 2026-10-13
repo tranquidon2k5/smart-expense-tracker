@@ -3,6 +3,8 @@ import * as db from "./mock/db";
 import { nowIso } from "./mock/queries";
 import { failIfErrorScenario, getScenario, simulateLatency } from "./mock/scenario";
 import { emitDataChanged } from "./events";
+import { USE_API } from "./data-source";
+import * as api from "./api/endpoints";
 
 /**
  * Trung tâm thông báo trong app (PRD §6.3: kênh bắt buộc). Gồm nhắc nhở giữ chuỗi,
@@ -14,6 +16,7 @@ function scoped(): AppNotification[] {
 }
 
 export async function listNotifications(type?: NotificationType): Promise<AppNotification[]> {
+  if (USE_API) return api.notifications.listNotifications(type);
   await simulateLatency(300);
   failIfErrorScenario();
   return scoped()
@@ -22,11 +25,13 @@ export async function listNotifications(type?: NotificationType): Promise<AppNot
 }
 
 export async function getUnreadCount(): Promise<number> {
+  if (USE_API) return api.notifications.getUnreadCount();
   await simulateLatency(150);
   return scoped().filter((n) => !n.isRead).length;
 }
 
 export async function markRead(id: string): Promise<void> {
+  if (USE_API) return api.notifications.markRead(id);
   await simulateLatency(120);
   const n = db.notifications.find((x) => x.id === id);
   if (n && !n.isRead) {
@@ -36,6 +41,7 @@ export async function markRead(id: string): Promise<void> {
 }
 
 export async function markAllRead(): Promise<number> {
+  if (USE_API) return api.notifications.markAllRead();
   await simulateLatency(200);
   const unread = db.notifications.filter((n) => !n.isRead);
   unread.forEach((n) => (n.isRead = true));
@@ -74,6 +80,8 @@ function pushReminder(): AppNotification {
  * khi đã qua giờ nhắc mà hôm nay chưa ghi chép. Tắt nhắc nhở → không bao giờ tạo.
  */
 export function runReminderSchedule(now: Date = new Date()): AppNotification | null {
+  // Bản api: job định kỳ ở backend tạo nhắc nhở (xem server/src/notifications/jobs.service.ts)
+  if (USE_API) return null;
   const s = db.reminderSettings;
   if (!s.enabled || getScenario() === "empty") return null;
   if (db.session.activeToday || db.session.lastReminderDate === db.MOCK_TODAY) return null;
@@ -85,6 +93,7 @@ export function runReminderSchedule(now: Date = new Date()): AppNotification | n
 
 /** Nút "Gửi thử nhắc nhở" trong Cài đặt — để xem nhắc nhở trông thế nào mà không phải chờ tới giờ */
 export async function sendTestReminder(): Promise<AppNotification> {
+  if (USE_API) return api.notifications.sendTestReminder();
   await simulateLatency(300);
   if (!db.reminderSettings.enabled) throw new Error("Nhắc nhở đang tắt. Bật lại để gửi thử.");
   return pushReminder();

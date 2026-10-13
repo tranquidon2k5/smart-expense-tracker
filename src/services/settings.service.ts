@@ -6,35 +6,17 @@ import { nowIso } from "./mock/queries";
 import { failIfErrorScenario, simulateLatency } from "./mock/scenario";
 import { AuthError, syncAccountProfile, validateEmail } from "./auth.service";
 import { emitDataChanged } from "./events";
-import { normalize } from "@/lib/text";
+import { transactionsToCsv } from "@shared/export";
+import { CURRENCIES, DELETE_PHRASE, REMINDER_TIME_RE, TIMEZONES, isDeleteConfirmation } from "@shared/validation";
+import { USE_API } from "./data-source";
+import * as api from "./api/endpoints";
 
-/** Cụm từ người dùng phải gõ để xác nhận xoá */
-export const DELETE_PHRASE = "XOÁ DỮ LIỆU";
-
-/** Đơn vị tiền tệ (F01). Bản demo mới hỗ trợ VND; các loại khác hiện "sắp có" thay vì giả vờ chạy. */
-export const CURRENCIES = [
-  { code: "VND", label: "Việt Nam đồng (đ)", available: true },
-  { code: "USD", label: "Đô la Mỹ ($)", available: false },
-  { code: "EUR", label: "Euro (€)", available: false },
-] as const;
-
-/** Múi giờ dùng để tính "một ngày" cho chuỗi ghi chép (PRD §6.2) */
-export const TIMEZONES = [
-  { id: "Asia/Ho_Chi_Minh", label: "Việt Nam (UTC+7)" },
-  { id: "Asia/Bangkok", label: "Bangkok (UTC+7)" },
-  { id: "Asia/Singapore", label: "Singapore (UTC+8)" },
-  { id: "Asia/Tokyo", label: "Tokyo (UTC+9)" },
-  { id: "Asia/Seoul", label: "Seoul (UTC+9)" },
-  { id: "Australia/Sydney", label: "Sydney (UTC+10/+11)" },
-  { id: "Europe/London", label: "London (UTC+0/+1)" },
-  { id: "Europe/Berlin", label: "Berlin (UTC+1/+2)" },
-  { id: "America/New_York", label: "New York (UTC−5/−4)" },
-  { id: "America/Los_Angeles", label: "Los Angeles (UTC−8/−7)" },
-] as const;
+export { CURRENCIES, DELETE_PHRASE, TIMEZONES };
 
 export const DEFAULT_REMINDER_TIME = "20:00";
 
 export async function getSettings(): Promise<UserSettings> {
+  if (USE_API) return api.settings.getSettings();
   await simulateLatency(350);
   failIfErrorScenario();
   const { fullName, email, currency, timezone, createdAt } = db.user;
@@ -42,6 +24,7 @@ export async function getSettings(): Promise<UserSettings> {
 }
 
 export async function updateProfile(input: { fullName: string; email: string }): Promise<User> {
+  if (USE_API) return api.settings.updateProfile(input);
   await simulateLatency(500);
   const fullName = input.fullName.trim().replace(/\s+/g, " ");
   if (fullName.length < 2) throw new AuthError("Nhập họ tên của bạn", "fullName");
@@ -57,6 +40,7 @@ export async function updateProfile(input: { fullName: string; email: string }):
 }
 
 export async function updatePreferences(input: { currency: string; timezone: string }): Promise<void> {
+  if (USE_API) return api.settings.updatePreferences(input);
   await simulateLatency(400);
   if (!CURRENCIES.some((c) => c.code === input.currency && c.available)) throw new Error("Đơn vị tiền tệ này chưa được hỗ trợ.");
   if (!TIMEZONES.some((t) => t.id === input.timezone)) throw new Error("Múi giờ không hợp lệ.");
@@ -66,8 +50,9 @@ export async function updatePreferences(input: { currency: string; timezone: str
 }
 
 export async function updateReminder(input: ReminderSettings): Promise<ReminderSettings> {
+  if (USE_API) return api.settings.updateReminder(input);
   await simulateLatency(300);
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.time)) throw new Error("Giờ nhắc cần dạng HH:mm, ví dụ 20:00.");
+  if (!REMINDER_TIME_RE.test(input.time)) throw new Error("Giờ nhắc cần dạng HH:mm, ví dụ 20:00.");
   Object.assign(db.reminderSettings, input);
   emitDataChanged();
   return { ...db.reminderSettings };
@@ -75,13 +60,15 @@ export async function updateReminder(input: ReminderSettings): Promise<ReminderS
 
 /** Xuất toàn bộ dữ liệu của người dùng (PRD §8 Quyền riêng tư) */
 export async function exportAllData(): Promise<DataExport> {
+  if (USE_API) return api.settings.exportAllData();
   await simulateLatency(600);
   failIfErrorScenario();
   return structuredClone({
     exportedAt: nowIso(),
     user: db.user,
     wallets: db.wallets,
-    categories: db.categories.filter((c) => c.userId !== null),
+    // Gồm cả danh mục mặc định để file xuất tự đọc được tên danh mục
+    categories: db.categories,
     transactions: db.transactions,
     budgets: db.budgets,
     classificationRules: db.classificationRules,
@@ -90,34 +77,15 @@ export async function exportAllData(): Promise<DataExport> {
   });
 }
 
-/** CSV giao dịch (mở được bằng Excel: UTF-8 có BOM, dấu phẩy, ngày dd/MM/yyyy) */
-export function transactionsToCsv(data: DataExport): string {
-  const cat = new Map(db.categories.map((c) => [c.id, c.name]));
-  const wallet = new Map(data.wallets.map((w) => [w.id, w.name]));
-  const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-  const rows = [...data.transactions]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .map((t) => {
-      const [y, m, d] = t.date.split("-");
-      return [
-        `${d}/${m}/${y}`,
-        q(t.description),
-        q(cat.get(t.categoryId) ?? ""),
-        q(wallet.get(t.walletId) ?? ""),
-        t.type === "income" ? "Thu" : "Chi",
-        String(t.type === "income" ? t.amount : -t.amount),
-        t.status === "pending" ? "Chờ duyệt" : "Đã xác nhận",
-      ].join(",");
-    });
-  return `﻿${["Ngày,Nội dung,Danh mục,Ví,Loại,Số tiền,Trạng thái", ...rows].join("\r\n")}`;
-}
+export { transactionsToCsv };
 
 /** Xoá toàn bộ dữ liệu, giữ lại tài khoản để dùng tiếp. Không hoàn tác được. */
 export async function deleteAllData(confirmation: string): Promise<void> {
+  if (USE_API) return api.settings.deleteAllData(confirmation);
   await simulateLatency(800);
   failIfErrorScenario();
   // Chấp nhận cả "XOÁ" lẫn "XÓA", có/không dấu
-  if (normalize(confirmation).replace(/\s+/g, " ").trim() !== "xoa du lieu") throw new Error("Gõ đúng XOÁ DỮ LIỆU để xác nhận.");
+  if (!isDeleteConfirmation(confirmation)) throw new Error("Gõ đúng XOÁ DỮ LIỆU để xác nhận.");
   clearCurrentDataset();
   emitDataChanged();
 }

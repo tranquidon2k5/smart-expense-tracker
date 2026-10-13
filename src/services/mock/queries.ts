@@ -1,5 +1,7 @@
 /** Truy vấn nội bộ trên mock db, có áp kịch bản (?demo=empty). Chỉ services dùng. */
-import type { Badge, CategoryBreakdown, CategorySlice, MonthTotals, Transaction, TransactionView, Wallet } from "@/types";
+import type { Badge, CategoryBreakdown, Transaction, TransactionView, Wallet } from "@/types";
+import { XP_RULES, levelFromXp, type XpAction } from "@shared/gamification-rules";
+import { OTHER_COLOR, breakdownFromTotals, monthsBetween, shiftMonth, sumTotals, totalsByCategory } from "@shared/stats";
 import { emitCelebrate, type Celebration } from "../events";
 import * as db from "./db";
 import { getScenario } from "./scenario";
@@ -29,50 +31,11 @@ export function confirmedTransactions(): Transaction[] {
   return scopedTransactions().filter((t) => t.status === "confirmed");
 }
 
-export function sumTotals(list: readonly Transaction[]): MonthTotals {
-  return list.reduce(
-    (acc, t) => {
-      acc[t.type] += t.amount;
-      return acc;
-    },
-    { income: 0, expense: 0 },
-  );
-}
-
-/** "2026-10", -1 → "2026-09" */
-export function shiftMonth(month: string, delta: number): string {
-  const [y, m] = month.split("-").map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return d.toISOString().slice(0, 7);
-}
-
-/** Danh sách tháng từ `from` tới `to` (tính cả hai đầu) */
-export function monthsBetween(from: string, to: string): string[] {
-  const out: string[] = [];
-  for (let m = from; m <= to && out.length < 120; m = shiftMonth(m, 1)) out.push(m);
-  return out;
-}
-
-export const OTHER_COLOR = "#64748B";
+export { OTHER_COLOR, monthsBetween, shiftMonth, sumTotals };
 
 /** Cơ cấu chi theo danh mục: tối đa `maxSlices` lát, quá thì gộp phần đuôi vào "Khác" (MASTER.md › Charts) */
 export function buildBreakdown(expenses: readonly Transaction[], month: string, maxSlices = 5): CategoryBreakdown {
-  const byCategory = new Map<string, number>();
-  for (const t of expenses) byCategory.set(t.categoryId, (byCategory.get(t.categoryId) ?? 0) + t.amount);
-
-  const total = expenses.reduce((s, t) => s + t.amount, 0);
-  const sorted = [...byCategory.entries()].sort((a, b) => b[1] - a[1]);
-  const head = sorted.length > maxSlices ? sorted.slice(0, maxSlices - 1) : sorted;
-  const restAmount = sorted.slice(head.length).reduce((s, [, v]) => s + v, 0);
-
-  const slices: CategorySlice[] = head.map(([id, amount]) => {
-    const c = db.categories.find((x) => x.id === id)!;
-    return { categoryId: id, name: c.name, color: c.color, amount, percent: (amount / total) * 100 };
-  });
-  if (restAmount > 0) {
-    slices.push({ categoryId: null, name: "Khác", color: OTHER_COLOR, amount: restAmount, percent: (restAmount / total) * 100 });
-  }
-  return { month, total, slices };
+  return breakdownFromTotals(totalsByCategory(expenses), db.categories, month, maxSlices);
 }
 
 /** Ảnh hưởng của một giao dịch lên số dư ví (thu +, chi −) */
@@ -113,16 +76,7 @@ export function celebrate(c: Celebration): void {
 
 // ───────────── XP & cấp độ ─────────────
 
-/** XP cần để lên cấp n = 100 × n (PRD §6.4) */
-export function levelFromXp(totalXp: number) {
-  let level = 1;
-  let floor = 0;
-  while (totalXp >= floor + 100 * (level + 1)) {
-    floor += 100 * (level + 1);
-    level += 1;
-  }
-  return { level, xpInLevel: totalXp - floor, xpForNextLevel: 100 * (level + 1) };
-}
+export { levelFromXp };
 
 /** Cộng XP thô (thưởng mốc chuỗi, nhiệm vụ…) và chúc mừng nếu lên cấp */
 export function addBonusXp(amount: number): void {
@@ -141,12 +95,7 @@ export function addBonusXp(amount: number): void {
   }
 }
 
-/** Bảng điểm XP có giới hạn theo ngày (PRD §6.4) */
-export const XP_RULES = {
-  add_transaction: { xp: 10, dailyLimit: 10 },
-  review: { xp: 5, dailyLimit: 10 },
-} as const;
-export type XpAction = keyof typeof XP_RULES;
+export { XP_RULES, type XpAction };
 
 export interface XpAward {
   xp: number;

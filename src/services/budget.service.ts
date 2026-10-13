@@ -3,6 +3,9 @@ import * as db from "./mock/db";
 import { evaluateBadges, scopedTransactions } from "./mock/queries";
 import { failIfErrorScenario, getScenario, simulateLatency } from "./mock/scenario";
 import { emitDataChanged } from "./events";
+import { USE_API } from "./data-source";
+import { getToday } from "./transaction.service";
+import * as api from "./api/endpoints";
 
 /** Hạn mức tối đa cho một danh mục (chặn gõ nhầm thêm số 0) */
 export const BUDGET_MAX = 1_000_000_000;
@@ -30,11 +33,12 @@ function scopedBudgets(): Budget[] {
 }
 
 export function getBudgetMonth(): string {
-  return CURRENT_MONTH;
+  return USE_API ? getToday().slice(0, 7) : CURRENT_MONTH;
 }
 
 /** Ngân sách tháng: các hạn mức đã đặt (mức dùng giảm dần) + danh mục chi chưa đặt */
 export async function getBudgetOverview(month = CURRENT_MONTH): Promise<BudgetOverview> {
+  if (USE_API) return api.budgets.getBudgetOverview(month);
   await simulateLatency(450);
   failIfErrorScenario();
   const txs = scopedTransactions();
@@ -81,6 +85,7 @@ function validateLimit(limitAmount: number) {
 
 /** Đặt (tạo hoặc cập nhật) hạn mức tháng cho một danh mục chi */
 export async function setBudget(categoryId: string, limitAmount: number, month = CURRENT_MONTH): Promise<Budget> {
+  if (USE_API) return api.budgets.setBudget(categoryId, limitAmount, month);
   await simulateLatency(350);
   validateLimit(limitAmount);
   const category = db.categories.find((c) => c.id === categoryId);
@@ -107,6 +112,7 @@ export async function setBudget(categoryId: string, limitAmount: number, month =
 }
 
 export async function deleteBudget(budgetId: string): Promise<void> {
+  if (USE_API) return api.budgets.deleteBudget(budgetId);
   await simulateLatency(300);
   const i = db.budgets.findIndex((b) => b.id === budgetId);
   if (i === -1) throw new Error("Không tìm thấy ngân sách, có thể đã bị xoá.");

@@ -1,0 +1,515 @@
+// Sổ Tiền — 17 bảng chính theo PRD §10 + 6 bảng hỗ trợ (đánh dấu "Bảng hỗ trợ").
+// Quy ước: tiền là BIGINT (đồng, luôn dương; dấu do cột `type`), ngày giao dịch là DATE
+// theo múi giờ người dùng, mốc thời gian là timestamptz.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────── Enum ─────────────
+
+enum UserRole {
+  user
+  admin
+}
+
+enum WalletType {
+  cash
+  bank
+  ewallet
+}
+
+enum TransactionType {
+  income
+  expense
+}
+
+enum TransactionSource {
+  form
+  nlp
+  csv
+}
+
+enum TransactionStatus {
+  confirmed
+  pending
+}
+
+enum RuleOrigin {
+  user
+  correction
+}
+
+enum ChatRole {
+  user
+  assistant
+  tool
+}
+
+enum AiFeature {
+  extract
+  classify
+  chat
+  motivation
+}
+
+enum ActivityType {
+  add_transaction
+  review_transaction
+  no_spend_day
+  login
+}
+
+enum MissionPeriod {
+  daily
+  weekly
+}
+
+enum MotivationContext {
+  morning
+  after_transaction
+  streak_at_risk
+  streak_milestone
+  streak_lost
+  welcome_back
+  first_day
+  budget_good
+}
+
+enum NotificationType {
+  reminder
+  celebration
+  budget_alert
+}
+
+// ───────────── 1. users ─────────────
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String   @map("password_hash")
+  fullName        String   @map("full_name")
+  currency        String   @default("VND") @db.VarChar(3)
+  timezone        String   @default("Asia/Ho_Chi_Minh")
+  role            UserRole @default(user)
+  isLocked        Boolean  @default(false) @map("is_locked")
+  reminderEnabled Boolean  @default(true) @map("reminder_enabled")
+  reminderTime    String   @default("20:00") @map("reminder_time") @db.VarChar(5)
+  reminderEmail   Boolean  @default(false) @map("reminder_email")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  wallets             Wallet[]
+  categories          Category[]
+  transactions        Transaction[]
+  budgets             Budget[]
+  classificationRules ClassificationRule[]
+  chatMessages        ChatMessage[]
+  aiLogs              AiLog[]
+  activityLogs        ActivityLog[]
+  streak              UserStreak?
+  level               UserLevel?
+  userMissions        UserMission[]
+  userBadges          UserBadge[]
+  notifications       Notification[]
+  transfers           WalletTransfer[]
+  conversations       Conversation[]
+  resetTokens         PasswordResetToken[]
+  refreshTokens       RefreshToken[]
+  freezeUsages        FreezeUsage[]
+  motivationHistory   MotivationHistory[]
+
+  @@map("users")
+}
+
+// ───────────── 2. wallets ─────────────
+
+model Wallet {
+  id        String     @id @default(cuid())
+  userId    String     @map("user_id")
+  name      String     @db.VarChar(50)
+  type      WalletType
+  balance   BigInt     @default(0)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  Transaction[]
+  transfersFrom WalletTransfer[] @relation("TransferFrom")
+  transfersTo   WalletTransfer[] @relation("TransferTo")
+
+  @@index([userId])
+  @@map("wallets")
+}
+
+// ───────────── 3. categories (user_id NULL = danh mục mặc định) ─────────────
+
+model Category {
+  id        String          @id @default(cuid())
+  userId    String?         @map("user_id")
+  name      String          @db.VarChar(30)
+  type      TransactionType
+  icon      String          @db.VarChar(40)
+  color     String          @db.VarChar(9)
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  user         User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets      Budget[]
+  rules        ClassificationRule[]
+
+  @@index([userId])
+  @@map("categories")
+}
+
+// ───────────── 4. transactions ─────────────
+
+model Transaction {
+  id           String            @id @default(cuid())
+  userId       String            @map("user_id")
+  walletId     String            @map("wallet_id")
+  categoryId   String            @map("category_id")
+  amount       BigInt
+  type         TransactionType
+  date         DateTime          @db.Date
+  description  String            @db.VarChar(255)
+  source       TransactionSource @default(form)
+  aiConfidence Float?            @map("ai_confidence")
+  status       TransactionStatus @default(confirmed)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet   Wallet   @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([userId, date])
+  @@index([userId, status])
+  @@index([userId, categoryId, date])
+  @@index([walletId])
+  @@map("transactions")
+}
+
+// ───────────── 5. budgets ─────────────
+
+model Budget {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  categoryId  String   @map("category_id")
+  /// "2026-10"
+  month       String   @db.Char(7)
+  limitAmount BigInt   @map("limit_amount")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, categoryId, month])
+  @@map("budgets")
+}
+
+// ───────────── 6. classification_rules ─────────────
+
+model ClassificationRule {
+  id          String     @id @default(cuid())
+  userId      String     @map("user_id")
+  keyword     String     @db.VarChar(60)
+  categoryId  String     @map("category_id")
+  createdFrom RuleOrigin @default(user) @map("created_from")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@map("classification_rules")
+}
+
+// ───────────── 7. chat_messages ─────────────
+
+model ChatMessage {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  conversationId String   @map("conversation_id")
+  role           ChatRole
+  content        String
+  toolCalls      Json?    @map("tool_calls")
+  sourceIds      String[] @default([]) @map("source_ids")
+  refused        Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("chat_messages")
+}
+
+// ───────────── 8. ai_logs ─────────────
+
+model AiLog {
+  id        String    @id @default(cuid())
+  userId    String?   @map("user_id")
+  feature   AiFeature
+  provider  String    @default("openai") @db.VarChar(20)
+  tokens    Int       @default(0)
+  latencyMs Int       @map("latency_ms")
+  success   Boolean
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId])
+  @@map("ai_logs")
+}
+
+// ───────────── 9. activity_logs ─────────────
+
+model ActivityLog {
+  id         String       @id @default(cuid())
+  userId     String       @map("user_id")
+  /// Ngày theo múi giờ người dùng
+  date       DateTime     @db.Date
+  actionType ActivityType @map("action_type")
+  /// XP đã cộng cho hành động này (0 = không cộng / đã chạm giới hạn / đã bị trừ lại)
+  xp         Int          @default(0)
+  /// Giao dịch liên quan (để trừ lại XP khi xoá trong ngày)
+  refId      String?      @map("ref_id")
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([refId])
+  @@map("activity_logs")
+}
+
+// ───────────── 10. user_streaks ─────────────
+
+model UserStreak {
+  userId         String    @id @map("user_id")
+  currentStreak  Int       @default(0) @map("current_streak")
+  longestStreak  Int       @default(0) @map("longest_streak")
+  lastActiveDate DateTime? @map("last_active_date") @db.Date
+  freezeCount    Int       @default(0) @map("freeze_count")
+  /// Ngày gần nhất đã được job chốt (chạy lại không đổi kết quả)
+  settledDate    DateTime? @map("settled_date") @db.Date
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_streaks")
+}
+
+// ───────────── 11. user_levels ─────────────
+
+model UserLevel {
+  userId        String @id @map("user_id")
+  totalXp       Int    @default(0) @map("total_xp")
+  level         Int    @default(1)
+  /// Số lần sửa danh mục AI đoán (huy hiệu "Thầy giáo của AI")
+  aiCorrections Int    @default(0) @map("ai_corrections")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_levels")
+}
+
+// ───────────── 12. missions ─────────────
+
+model Mission {
+  id        String        @id @default(cuid())
+  code      String        @unique @db.VarChar(32)
+  title     String        @db.VarChar(80)
+  period    MissionPeriod
+  target    Int
+  xp        Int
+  isActive  Boolean       @default(true) @map("is_active")
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  userMissions UserMission[]
+
+  @@map("missions")
+}
+
+// ───────────── 13. user_missions ─────────────
+
+model UserMission {
+  userId      String    @map("user_id")
+  missionId   String    @map("mission_id")
+  /// "2026-10-12" cho nhiệm vụ ngày, "2026-W42" cho nhiệm vụ tuần
+  periodKey   String    @map("period_key") @db.VarChar(10)
+  progress    Int       @default(0)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, missionId, periodKey])
+  @@map("user_missions")
+}
+
+// ───────────── 14. badges ─────────────
+
+model Badge {
+  id        String  @id @default(cuid())
+  code      String  @unique @db.VarChar(32)
+  name      String  @db.VarChar(60)
+  icon      String  @db.VarChar(40)
+  condition String  @db.VarChar(160)
+  isActive  Boolean @default(true) @map("is_active")
+
+  userBadges UserBadge[]
+
+  @@map("badges")
+}
+
+// ───────────── 15. user_badges ─────────────
+
+model UserBadge {
+  userId     String   @map("user_id")
+  badgeId    String   @map("badge_id")
+  unlockedAt DateTime @default(now()) @map("unlocked_at") @db.Timestamptz
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, badgeId])
+  @@map("user_badges")
+}
+
+// ───────────── 16. motivation_messages ─────────────
+
+model MotivationMessage {
+  id        String            @id @default(cuid())
+  context   MotivationContext
+  template  String            @db.VarChar(200)
+  isActive  Boolean           @default(true) @map("is_active")
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  history MotivationHistory[]
+
+  @@index([context])
+  @@map("motivation_messages")
+}
+
+// ───────────── 17. notifications ─────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String?          @db.VarChar(120)
+  content   String
+  link      String?          @db.VarChar(120)
+  isRead    Boolean          @default(false) @map("is_read")
+  /// Khoá chống trùng cho job (vd. "reminder:2026-10-12") — chạy lại không tạo thêm
+  dedupeKey String?          @map("dedupe_key") @db.VarChar(60)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+// ═════════════ Bảng hỗ trợ (ngoài 17 bảng PRD) ═════════════
+
+/// Bảng hỗ trợ: chuyển tiền giữa hai ví (không phải thu/chi)
+model WalletTransfer {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  fromWalletId String   @map("from_wallet_id")
+  toWalletId   String   @map("to_wallet_id")
+  amount       BigInt
+  date         DateTime @db.Date
+  note         String   @default("") @db.VarChar(100)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromWallet Wallet @relation("TransferFrom", fields: [fromWalletId], references: [id], onDelete: Cascade)
+  toWallet   Wallet @relation("TransferTo", fields: [toWalletId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("wallet_transfers")
+}
+
+/// Bảng hỗ trợ: nhóm tin nhắn chatbot thành cuộc trò chuyện
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  title     String   @db.VarChar(60)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
+/// Bảng hỗ trợ: mã đặt lại mật khẩu 6 số (lưu dạng băm, hết hạn sau 15 phút)
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  codeHash  String    @map("code_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// Bảng hỗ trợ: refresh token (băm SHA-256), xoay vòng mỗi lần làm mới
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  /// Các token cùng một lần đăng nhập — dùng lại token cũ thì thu hồi cả họ
+  familyId   String    @map("family_id")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+/// Bảng hỗ trợ: ngày đã dùng thẻ đóng băng (giữ chuỗi, không tính là ngày ghi chép)
+model FreezeUsage {
+  userId String   @map("user_id")
+  date   DateTime @db.Date
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, date])
+  @@map("freeze_usages")
+}
+
+/// Bảng hỗ trợ: câu khích lệ đã hiện cho ai, ngày nào (ưu tiên câu chưa hiện trong 7 ngày)
+model MotivationHistory {
+  userId    String   @map("user_id")
+  messageId String   @map("message_id")
+  shownOn   DateTime @map("shown_on") @db.Date
+
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message MotivationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@id([userId, messageId, shownOn])
+  @@map("motivation_history")
+}

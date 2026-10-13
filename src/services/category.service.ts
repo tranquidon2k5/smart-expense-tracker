@@ -4,6 +4,8 @@ import { normalize, scopedTransactions } from "./mock/queries";
 import { failIfErrorScenario, getScenario, simulateLatency } from "./mock/scenario";
 import { emitDataChanged } from "./events";
 import { CATEGORY_COLORS, CATEGORY_ICON_OPTIONS, CATEGORY_NAME_MAX } from "@/lib/category-style";
+import { USE_API } from "./data-source";
+import * as api from "./api/endpoints";
 
 const CURRENT_MONTH = db.MOCK_TODAY.slice(0, 7);
 
@@ -14,6 +16,7 @@ function scopedCategories(): Category[] {
 
 /** Danh mục kèm số giao dịch, số tiền tháng này, có ngân sách hay không (F03) */
 export async function listCategoryUsage(): Promise<CategoryUsage[]> {
+  if (USE_API) return api.categories.listCategoryUsage();
   await simulateLatency(400);
   failIfErrorScenario();
   const txs = scopedTransactions();
@@ -36,7 +39,8 @@ export function validateCategory(input: CategoryInput, ignoreId?: string): strin
   const name = input.name.trim();
   if (!name) return "Nhập tên danh mục.";
   if (name.length > CATEGORY_NAME_MAX) return `Tên tối đa ${CATEGORY_NAME_MAX} ký tự.`;
-  const duplicate = db.categories.find(
+  // Bản api: trùng tên do server kiểm (biết đủ danh mục của người dùng)
+  const duplicate = USE_API ? undefined : db.categories.find(
     (c) => c.id !== ignoreId && c.type === input.type && normalize(c.name) === normalize(name),
   );
   if (duplicate) return `Đã có danh mục ${input.type === "income" ? "thu" : "chi"} “${duplicate.name}”.`;
@@ -53,6 +57,7 @@ function ownOrThrow(id: string): Category {
 }
 
 export async function createCategory(input: CategoryInput): Promise<Category> {
+  if (USE_API) return api.categories.createCategory(input);
   await simulateLatency(350);
   const error = validateCategory(input);
   if (error) throw new Error(error);
@@ -71,6 +76,7 @@ export async function createCategory(input: CategoryInput): Promise<Category> {
 
 /** Sửa tên, biểu tượng, màu. Không đổi loại thu/chi vì giao dịch cũ sẽ sai dấu. */
 export async function updateCategory(id: string, input: Omit<CategoryInput, "type">): Promise<Category> {
+  if (USE_API) return api.categories.updateCategory(id, input);
   await simulateLatency(350);
   const category = ownOrThrow(id);
   const error = validateCategory({ ...input, type: category.type }, id);
@@ -85,6 +91,7 @@ export async function updateCategory(id: string, input: Omit<CategoryInput, "typ
  * cùng loại để chuyển chúng sang (`moveToId`).
  */
 export async function deleteCategory(id: string, moveToId?: string): Promise<{ moved: number }> {
+  if (USE_API) return api.categories.deleteCategory(id, moveToId);
   await simulateLatency(400);
   const category = ownOrThrow(id);
   const used =
