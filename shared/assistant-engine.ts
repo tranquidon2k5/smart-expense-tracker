@@ -37,9 +37,15 @@ const CATEGORY_SYNONYMS: [string[], string][] = [
   [["thuong"], "c-bonus"],
 ];
 
+/**
+ * Chủ đề ngoài phạm vi. Dùng cụm từ cụ thể (so khớp trên câu đã chuẩn hoá, có khoảng trắng hai đầu)
+ * để không bắt nhầm: "giao dịch" ≠ "dịch", "như vậy" ≠ "vay", "vàng" chỉ khi nói về giá/mua vàng.
+ */
 const OUT_OF_SCOPE = [
-  "dau tu", "co phieu", "chung khoan", "crypto", "bitcoin", "coin", "vay ", "khoan vay", "lai suat", "vang",
-  "thoi tiet", "nau an", "cong thuc", "bong da", "bai hat", "dich ", "viet code", "lap trinh",
+  "dau tu", "co phieu", "chung khoan", "crypto", "bitcoin", " coin ", "vay tien", "vay no", "di vay", "vay mua",
+  "khoan vay", "lai suat", "gia vang", "mua vang", "vang mieng",
+  "thoi tiet", "nau an", "cong thuc", "bong da", "bai hat", "dich sang", "dich giup", "dich cau", "phien dich",
+  "viet code", "lap trinh",
 ];
 
 function shiftMonth(month: string, delta: number): string {
@@ -328,7 +334,7 @@ export function planQuestion(question: string, ctx: Pick<EngineContext, "categor
   }
   if (has("ngan sach", "han muc", " vuot ")) return call("tinh_trang_ngan_sach", { thang: month });
   if (has("lon nhat", "dat nhat", "nhieu tien nhat", " top ") && has("khoan", "giao dich", " top ")) {
-    const n = Number(q.match(/(\d+)\s*(?:khoan|giao dich)/)?.[1] ?? 5);
+    const n = Number(q.match(/(\d+)\s*(?:khoan|giao dich)/)?.[1] ?? q.match(/ top (\d+)/)?.[1] ?? 5);
     return call("top_khoan_chi", { thang: month, so_luong: Math.min(Math.max(n, 1), 20) });
   }
   if (has("vao dau", "vao gi", "danh muc nao", "nhieu nhat")) return call("chi_theo_danh_muc", { thang: month });
@@ -397,13 +403,16 @@ export const TOOL_DEFINITIONS: { name: ToolName; description: string; parameters
   },
   {
     name: "so_sanh_hai_thang",
-    description: "So sánh tổng chi (hoặc một danh mục) giữa hai tháng",
+    description:
+      "So sánh tổng chi (hoặc một danh mục) giữa hai tháng. Giữ đúng thứ tự trong câu hỏi: " +
+      "“So sánh tháng 9 với tháng 8” → thang_a = tháng 9, thang_b = tháng 8; " +
+      "“Tháng này chi nhiều hơn tháng trước không?” → thang_a = tháng này, thang_b = tháng trước.",
     parameters: {
       type: "object",
       properties: {
         danh_muc: { type: ["string", "null"], description: "Tên danh mục, null = tổng chi" },
-        thang_a: { type: "string", description: "Tháng thứ nhất yyyy-MM" },
-        thang_b: { type: "string", description: "Tháng thứ hai yyyy-MM" },
+        thang_a: { type: "string", description: "Tháng được nhắc TRƯỚC trong câu hỏi, dạng yyyy-MM (tháng đem ra so)" },
+        thang_b: { type: "string", description: "Tháng được nhắc SAU trong câu hỏi, dạng yyyy-MM (tháng làm mốc so sánh)" },
       },
       required: ["danh_muc", "thang_a", "thang_b"],
       additionalProperties: false,

@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { addDays, isoWeekKey, mondayOf, timeIn, todayIn } from "./dates";
 import { computeStreaks, levelFromXp, nextMilestone } from "./gamification-rules";
-import { guessWallet, parseQuickEntryText } from "./quick-entry";
+import { classifyByRules, guessWallet, parseQuickEntryText } from "./quick-entry";
+import { isOutOfScope, planQuestion } from "./assistant-engine";
 import { breakdownFromTotals, comparisonRows } from "./stats";
 import { isDeleteConfirmation, validatePassword } from "./validation";
 
@@ -82,5 +83,44 @@ describe("Kiểm tra tài khoản", () => {
     expect(isDeleteConfirmation("XÓA DỮ LIỆU")).toBe(true);
     expect(isDeleteConfirmation("xoa  du lieu")).toBe(true);
     expect(isDeleteConfirmation("xoa")).toBe(false);
+  });
+});
+
+describe("Luật mặc định không bắt nhầm", () => {
+  const cats = ["c-food", "c-move", "c-study", "c-fun", "c-shop", "c-bill", "c-health", "c-other", "c-salary", "c-bonus"].map((id) => ({
+    id,
+    type: id === "c-salary" || id === "c-bonus" ? ("income" as const) : ("expense" as const),
+  }));
+  const cat = (text: string) => classifyByRules(text, { categories: cats, userRules: [] }).category?.id ?? null;
+
+  it.each([
+    ["GRAB*FOOD 3021 HCM", "c-food"],
+    ["SHOPEEFOOD*DON 88123", "c-food"],
+    ["GRAB*RIDE 8812 HCM", "c-move"],
+    ["NETFLIX.COM", "c-fun"],
+    ["Phí quản lý chung cư", null],
+    ["Điện máy xanh nồi cơm", null],
+    ["Kệ sách IKEA", null],
+    ["Cơm văn phòng", "c-food"],
+    ["Quần kaki Uniqlo", "c-shop"],
+    ["Mua sách Fahasa", "c-study"],
+  ])("“%s” → %s", (text, expected) => {
+    expect(cat(text)).toBe(expected);
+  });
+});
+
+describe("Phạm vi câu hỏi trợ lý", () => {
+  it("“giao dịch”, “như vậy” không bị coi là ngoài phạm vi; đầu tư, vay tiền, dịch thuật thì có", () => {
+    expect(isOutOfScope("Top 10 giao dịch lớn nhất tháng 8")).toBe(false);
+    expect(isOutOfScope("Chi như vậy có nhiều không?")).toBe(false);
+    expect(isOutOfScope("Có nên vay tiền mua xe không?")).toBe(true);
+    expect(isOutOfScope("Dịch giúp mình câu này sang tiếng Anh")).toBe(true);
+  });
+
+  it("top N lấy đúng N (tối đa 20)", () => {
+    const plan = planQuestion("Top 10 giao dịch lớn nhất tháng 8", { today: "2026-10-12", categories: [] });
+    expect(plan).toEqual({ call: { name: "top_khoan_chi", args: { thang: "2026-08", so_luong: 10 } } });
+    const top = planQuestion("Top 7 tháng này", { today: "2026-10-12", categories: [] });
+    expect(top).toMatchObject({ call: { args: { so_luong: 7 } } });
   });
 });

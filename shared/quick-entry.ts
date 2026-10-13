@@ -10,19 +10,28 @@ import { normalize } from "./text";
 /** Ngưỡng độ tin cậy: thấp hơn → hàng chờ duyệt (PRD §9.1) */
 export const CONFIDENCE_THRESHOLD = 0.7;
 
-/** Luật từ khoá mặc định của hệ thống (id danh mục mặc định) */
-export const KEYWORD_RULES: { keywords: string[]; categoryId: string }[] = [
-  { keywords: ["luong"], categoryId: "c-salary" },
-  { keywords: ["thuong"], categoryId: "c-bonus" },
+/**
+ * Luật từ khoá mặc định của hệ thống (id danh mục mặc định). Chạy theo thứ tự, luật đầu tiên khớp
+ * thắng; `exclude` là cụm từ làm luật KHÔNG áp dụng (tránh bắt nhầm như "quản lý" ≠ "quần").
+ */
+export const KEYWORD_RULES: { keywords: string[]; categoryId: string; exclude?: string[] }[] = [
+  { keywords: ["luong"], categoryId: "c-salary", exclude: ["luong thuc", "chat luong", "so luong", "dung luong", "luong tam"] },
+  { keywords: ["thuong"], categoryId: "c-bonus", exclude: ["binh thuong", "thuong hieu", "thuong xuyen", "thuong mai", "bi thuong", "tham thuong"] },
   { keywords: ["hoan tien", "ban do", "duoc cho", "me cho", "bo cho"], categoryId: "c-income-other" },
+  // Giao đồ ăn đứng trước Di chuyển / Mua sắm: "GRAB*FOOD" là ăn uống, không phải đi xe
+  { keywords: ["grab food", "grabfood", "shopeefood", "shopee food", "baemin", "gofood", "be food", "loship"], categoryId: "c-food" },
   // Từ khoá ngắn có khoảng trắng hai bên để không khớp nhầm ("pho" ≠ "phong", "an" ≠ "Lan")
-  { keywords: [" pho ", " bun ", " com ", " an ", " banh mi", "ca phe", "cafe", " cf ", "tra sua", " lau ", " nuong", " xoi ", "highlands", "tra da"], categoryId: "c-food" },
+  {
+    keywords: [" pho ", " bun ", " com ", " an ", " banh mi", "ca phe", "cafe", " cf ", "tra sua", " lau ", " nuong", " xoi ", "highlands", "tra da"],
+    categoryId: "c-food",
+    exclude: ["noi com", "nau an", "an toan", "an ninh", "phong an"],
+  },
   { keywords: ["grab", "be bike", " xang", "taxi", "xe buyt", "gui xe", "ve tau", "xanh sm"], categoryId: "c-move" },
-  { keywords: [" sach", " hoc ", "khoa hoc", "ielts", "toeic", "giao trinh"], categoryId: "c-study" },
+  { keywords: [" sach", " hoc ", "khoa hoc", "ielts", "toeic", "giao trinh"], categoryId: "c-study", exclude: ["ke sach", "danh sach", "sach se", "tu sach", "lam sach"] },
   { keywords: [" phim", "cgv", "karaoke", " game", "netflix", "spotify", "ca nhac", "du lich"], categoryId: "c-fun" },
-  { keywords: ["shopee", "tiki", "lazada", " ao ", " quan ", " giay", "my pham", "uniqlo"], categoryId: "c-shop" },
+  { keywords: ["shopee", "tiki", "lazada", " ao ", " quan ", " giay", "my pham", "uniqlo"], categoryId: "c-shop", exclude: ["quan ly", "quan an", "quan nhau", "quan cafe", "quan com"] },
   { keywords: ["tien dien", "tien nuoc", "internet", "wifi", "tien nha", "tien phong", "cuoc dien thoai", " 4g"], categoryId: "c-bill" },
-  { keywords: ["thuoc", "kham", "gym", "nha khoa", "bao hiem", "pharmacity"], categoryId: "c-health" },
+  { keywords: ["thuoc", "kham", "gym", "nha khoa", "bao hiem", "pharmacity"], categoryId: "c-health", exclude: ["thuoc la"] },
 ];
 
 /** Gợi ý của "LLM" giả lập (chỉ dùng ở chế độ mock / khi không có LLM): đoán được nhưng chưa chắc */
@@ -37,7 +46,9 @@ export const INCOME_HINTS = ["luong", "thuong", "nhan ", "duoc cho", "hoan tien"
 
 /** Văn bản chuẩn hoá có khoảng trắng hai đầu để khớp từ khoá theo từ */
 export function paddedNormalize(text: string): string {
-  return ` ${normalize(text).replace(/[^a-z0-9]+/g, " ")} `;
+  // Bỏ đuôi tên miền ("NETFLIX.COM" → "netflix") để ".com" không bị hiểu là "cơm"
+  const withoutDomain = normalize(text).replace(/\.(com|net|org|vn|io)(\.vn)?\b/g, " ");
+  return ` ${withoutDomain.replace(/[^a-z0-9]+/g, " ")} `;
 }
 
 export interface ClassifierCategory {
@@ -75,6 +86,7 @@ export function classifyByRules<C extends ClassifierCategory>(
   if (userRule) return { category: fits(userRule.categoryId), confidence: 0.97, source: "rule" };
   for (const r of KEYWORD_RULES) {
     const c = fits(r.categoryId);
+    if (r.exclude?.some((k) => norm.includes(k))) continue;
     if (c && r.keywords.some((k) => norm.includes(k))) return { category: c, confidence: 0.95, source: "rule" };
   }
   if (options.includeGuesses) {
