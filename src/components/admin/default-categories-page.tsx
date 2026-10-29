@@ -24,11 +24,17 @@ import { Panel } from "@/components/panel";
 import { useServiceQuery } from "@/hooks/use-service-query";
 import { adminService } from "@/services";
 import { AdminHeader } from "./admin-shell";
+import { getActiveLocale, getMessages, INTL_LOCALE } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { adminMessages } from "@/i18n/messages/admin";
+import { te } from "@/i18n/errors";
 
-const nf = new Intl.NumberFormat("vi-VN");
+const msg = () => getMessages(adminMessages);
+
+const nf = { format: (v: number) => new Intl.NumberFormat(INTL_LOCALE[getActiveLocale()]).format(v) };
 
 export function DefaultCategoriesPage() {
-  const list = useServiceQuery(() => adminService.listDefaultCategories());
+  const list = useServiceQuery(() => adminService.listDefaultCategories(), "", { raw: true });
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Category | null>(null);
   const [formType, setFormType] = React.useState<TransactionType>("expense");
@@ -46,10 +52,10 @@ export function DefaultCategoriesPage() {
     setBusy(true);
     try {
       await adminService.deleteDefaultCategory(deleting.id);
-      toast.success(`Đã xoá danh mục “${deleting.name}”`);
+      toast.success(msg().categories.deleted(deleting.name));
       setDeleting(null);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không xoá được");
+      toast.error(e instanceof Error ? te(e.message) : msg().deleteFailed);
     } finally {
       setBusy(false);
     }
@@ -64,27 +70,27 @@ export function DefaultCategoriesPage() {
         title={
           <span className="flex items-center gap-1.5">
             <Icon aria-hidden className={type === "income" ? "size-4 text-income" : "size-4 text-expense"} />
-            {type === "income" ? "Danh mục thu" : "Danh mục chi"}
+            {msg().categories.group(type === "income")}
           </span>
         }
         className="p-0 md:p-0 [&>header]:mb-0 [&>header]:border-b [&>header]:px-4 [&>header]:py-3"
         action={
           <Button size="sm" variant="outline" onClick={() => openNew(type)}>
-            <Plus aria-hidden /> Thêm
+            <Plus aria-hidden /> {msg().categories.add}
           </Button>
         }
       >
         {list.error ? (
           <ErrorState error={list.error} onRetry={list.refetch} />
         ) : (
-          <Table aria-label={type === "income" ? "Danh mục thu mặc định" : "Danh mục chi mặc định"}>
+          <Table aria-label={msg().categories.tableLabel(type === "income")}>
             <TableHeader className="bg-surface-subtle">
               <TableRow className="hover:bg-transparent">
-                <TableHead>Danh mục</TableHead>
-                <TableHead>Màu</TableHead>
-                <TableHead className="text-right">Đang dùng</TableHead>
+                <TableHead>{msg().categories.category}</TableHead>
+                <TableHead>{msg().categories.color}</TableHead>
+                <TableHead className="text-right">{msg().categories.inUse}</TableHead>
                 <TableHead className="w-24 text-right">
-                  <span className="sr-only">Thao tác</span>
+                  <span className="sr-only">{getMessages(commonMessages).actions}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -111,14 +117,14 @@ export function DefaultCategoriesPage() {
                           {c.color.toUpperCase()}
                         </span>
                       </TableCell>
-                      <TableCell className="num text-right">{c.usage ? `${nf.format(c.usage)} giao dịch` : "Chưa dùng"}</TableCell>
+                      <TableCell className="num text-right">{c.usage ? msg().categories.usage(nf.format(c.usage)) : msg().categories.unused}</TableCell>
                       <TableCell className="text-right">
                         <span className="inline-flex gap-0.5">
                           <Button
                             size="icon-xs"
                             variant="ghost"
-                            aria-label={`Sửa ${c.name}`}
-                            title={`Sửa ${c.name}`}
+                            aria-label={msg().editItem(c.name)}
+                            title={msg().editItem(c.name)}
                             onClick={() => {
                               setEditing(c);
                               setFormType(c.type);
@@ -135,7 +141,7 @@ export function DefaultCategoriesPage() {
                                 <Button
                                   size="icon-xs"
                                   variant="ghost"
-                                  aria-label={`Xoá ${c.name}`}
+                                  aria-label={msg().deleteItem(c.name)}
                                   disabled={c.usage > 0}
                                   onClick={() => setDeleting(c)}
                                   className="text-danger hover:bg-expense-soft hover:text-danger max-md:size-9"
@@ -144,7 +150,7 @@ export function DefaultCategoriesPage() {
                                 </Button>
                               </span>
                             </TooltipTrigger>
-                            <TooltipContent>{c.usage ? "Đang có giao dịch dùng danh mục này nên không xoá được" : `Xoá ${c.name}`}</TooltipContent>
+                            <TooltipContent>{c.usage ? msg().categories.cantDelete : msg().deleteItem(c.name)}</TooltipContent>
                           </Tooltip>
                         </span>
                       </TableCell>
@@ -159,7 +165,7 @@ export function DefaultCategoriesPage() {
 
   return (
     <>
-      <AdminHeader title="Danh mục mặc định" description="Mọi người dùng đều thấy các danh mục này. Danh mục đang có giao dịch chỉ đổi được tên, biểu tượng và màu." />
+      <AdminHeader title={msg().categories.title} description={msg().categories.intro} />
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-12">
         <div className="xl:col-span-7">{section("expense")}</div>
         <div className="xl:col-span-5">{section("income")}</div>
@@ -179,14 +185,14 @@ export function DefaultCategoriesPage() {
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && !busy && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xoá danh mục mặc định “{deleting?.name}”?</AlertDialogTitle>
-            <AlertDialogDescription>Danh mục chưa có giao dịch nào. Sau khi xoá, người dùng sẽ không còn thấy danh mục này.</AlertDialogDescription>
+            <AlertDialogTitle>{msg().categories.confirmTitle(deleting?.name ?? "")}</AlertDialogTitle>
+            <AlertDialogDescription>{msg().categories.confirmText}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Giữ lại</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{msg().keep}</AlertDialogCancel>
             <Button disabled={busy} onClick={() => void remove()} className="bg-danger text-white hover:bg-danger/90">
               {busy && <Loader2 aria-hidden className="motion-safe:animate-spin" />}
-              Xoá danh mục
+              {msg().categories.confirmDelete}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

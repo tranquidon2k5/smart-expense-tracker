@@ -22,21 +22,23 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { transactionService, walletService } from "@/services";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { walletsMessages } from "@/i18n/messages/wallets";
+import { te } from "@/i18n/errors";
 
-const TYPE_META: Record<WalletType, { label: string; icon: typeof Banknote }> = {
-  cash: { label: "Tiền mặt", icon: Banknote },
-  bank: { label: "Tài khoản ngân hàng", icon: Landmark },
-  ewallet: { label: "Ví điện tử", icon: Smartphone },
-};
+const msg = () => getMessages(walletsMessages);
+
+const TYPE_ICONS: Record<WalletType, typeof Banknote> = { cash: Banknote, bank: Landmark, ewallet: Smartphone };
+const typeMeta = (type: WalletType) => ({ label: msg().types[type], icon: TYPE_ICONS[type] });
 
 function WalletCard({ wallet, selected, onSelect }: { wallet: WalletSummary; selected: boolean; onSelect: () => void }) {
-  const meta = TYPE_META[wallet.type];
+  const meta = typeMeta(wallet.type);
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      aria-label={`${wallet.name}, ${meta.label}, số dư ${formatMoney(wallet.balance)}. Xem giao dịch của ví này`}
+      aria-label={msg().cardLabel(wallet.name, meta.label, formatMoney(wallet.balance))}
       className={cn(
         "flex min-w-0 flex-col rounded-xl border bg-card p-4 text-left transition-colors duration-150 hover:border-primary/40 md:p-5",
         selected && "border-primary ring-1 ring-primary",
@@ -52,18 +54,18 @@ function WalletCard({ wallet, selected, onSelect }: { wallet: WalletSummary; sel
             <span className="block text-xs text-muted-foreground">{meta.label}</span>
           </span>
         </span>
-        {selected && <span className="text-xs font-medium text-primary">Đang xem</span>}
+        {selected && <span className="text-xs font-medium text-primary">{msg().viewing}</span>}
       </span>
       <Money amount={wallet.balance} className={cn("mt-3 text-2xl leading-8 font-semibold", wallet.balance < 0 && "text-expense")} />
       <span className="mt-2 flex flex-wrap gap-x-3 text-[13px] text-muted-foreground">
         {wallet.monthIncome || wallet.monthExpense ? (
           <>
-            <span>Tháng này:</span>
+            <span>{msg().thisMonth}</span>
             {wallet.monthIncome > 0 && <Money amount={wallet.monthIncome} type="income" />}
             {wallet.monthExpense > 0 && <Money amount={wallet.monthExpense} type="expense" />}
           </>
         ) : (
-          <span>Chưa có thu chi tháng này</span>
+          <span>{msg().noActivity}</span>
         )}
       </span>
     </button>
@@ -89,18 +91,18 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
   };
 
   const submit = async () => {
-    if (!fromId || !toId) return setError("Chọn ví chuyển và ví nhận.");
-    if (fromId === toId) return setError("Ví chuyển và ví nhận phải khác nhau.");
-    if (!amount) return setError("Nhập số tiền cần chuyển.");
+    if (!fromId || !toId) return setError(msg().transfer.pickBoth);
+    if (fromId === toId) return setError(msg().transfer.sameWallet);
+    if (!amount) return setError(msg().transfer.amountRequired);
     setError(null);
     setSaving(true);
     try {
       const t = await walletService.transfer({ fromWalletId: fromId, toWalletId: toId, amount, date, note });
-      toast.success(`Đã chuyển ${formatMoney(t.amount)}`, { description: `${t.fromWallet.name} → ${t.toWallet.name}` });
+      toast.success(msg().transfer.done(formatMoney(t.amount)), { description: `${t.fromWallet.name} → ${t.toWallet.name}` });
       setAmount(undefined);
       setNote("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chưa chuyển được, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().transfer.failed);
     } finally {
       setSaving(false);
     }
@@ -119,7 +121,7 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
       ));
 
   return (
-    <Panel title="Chuyển tiền giữa các ví" description="Không tính là khoản thu hay chi.">
+    <Panel title={msg().transfer.title} description={msg().transfer.hint}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -131,7 +133,7 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <div>
               <label htmlFor={`${ids}-from`} className="mb-1.5 block text-[13px] font-medium">
-                Từ ví
+                {msg().transfer.from}
               </label>
               <Select
                 value={fromId}
@@ -141,18 +143,18 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
                 }}
               >
                 <SelectTrigger id={`${ids}-from`} className="w-full">
-                  <SelectValue placeholder="Chọn ví" />
+                  <SelectValue placeholder={msg().transfer.pickWallet} />
                 </SelectTrigger>
                 <SelectContent>{walletOptions()}</SelectContent>
               </Select>
             </div>
             <div>
               <label htmlFor={`${ids}-to`} className="mb-1.5 block text-[13px] font-medium">
-                Đến ví
+                {msg().transfer.to}
               </label>
               <Select value={toId} onValueChange={setToId}>
                 <SelectTrigger id={`${ids}-to`} className="w-full">
-                  <SelectValue placeholder="Chọn ví" />
+                  <SelectValue placeholder={msg().transfer.pickWallet} />
                 </SelectTrigger>
                 <SelectContent>{walletOptions(fromId)}</SelectContent>
               </Select>
@@ -163,8 +165,8 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
             variant="outline"
             size="icon"
             onClick={swap}
-            aria-label="Đổi chiều chuyển"
-            title="Đổi chiều chuyển"
+            aria-label={msg().transfer.swap}
+            title={msg().transfer.swap}
             className="mb-[18px] max-md:size-11"
           >
             <ArrowDownUp aria-hidden />
@@ -173,7 +175,7 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
 
         <div>
           <label htmlFor={`${ids}-amount`} className="mb-1.5 block text-[13px] font-medium">
-            Số tiền
+            {msg().transfer.amount}
           </label>
           <AmountInput
             id={`${ids}-amount`}
@@ -184,10 +186,10 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
           />
           <p id={`${ids}-balance`} className={cn("mt-1 text-xs", overBalance ? "text-danger" : "text-muted-foreground")}>
             {overBalance && <CircleAlert aria-hidden className="mr-1 inline size-3.5 align-[-2px]" />}
-            Số dư {from?.name ?? ""}: <span className="num">{formatMoney(from?.balance ?? 0)}</span>
-            {overBalance && " — không đủ để chuyển"}
+            {msg().transfer.balanceOf(from?.name ?? "")} <span className="num">{formatMoney(from?.balance ?? 0)}</span>
+            {overBalance && msg().transfer.insufficient}
           </p>
-          <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Chọn nhanh số tiền">
+          <div className="mt-2 flex flex-wrap gap-1.5" aria-label={msg().transfer.presets}>
             {[200_000, 500_000, 1_000_000, 2_000_000].map((v) => (
               <button
                 key={v}
@@ -204,15 +206,15 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor={`${ids}-date`} className="mb-1.5 block text-[13px] font-medium">
-              Ngày
+              {msg().transfer.date}
             </label>
             <DatePicker id={`${ids}-date`} value={date} onChange={setDate} max={today} />
           </div>
           <div>
             <label htmlFor={`${ids}-note`} className="mb-1.5 block text-[13px] font-medium">
-              Ghi chú
+              {msg().transfer.note}
             </label>
-            <Input id={`${ids}-note`} value={note} maxLength={100} onChange={(e) => setNote(e.target.value)} placeholder="Không bắt buộc" />
+            <Input id={`${ids}-note`} value={note} maxLength={100} onChange={(e) => setNote(e.target.value)} placeholder={msg().transfer.optional} />
           </div>
         </div>
 
@@ -225,7 +227,7 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
 
         <Button type="submit" disabled={saving || overBalance} aria-busy={saving} className="max-md:h-11">
           {saving && <Loader2 aria-hidden className="animate-spin" />}
-          Chuyển {amount ? <span className="num">{formatMoney(amount)}</span> : "tiền"}
+          {msg().transfer.submit} {amount ? <span className="num">{formatMoney(amount)}</span> : msg().transfer.money}
           {from && to && (
             <span className="font-normal opacity-90">
               {" "}
@@ -240,9 +242,9 @@ function TransferForm({ wallets, today }: { wallets: WalletSummary[]; today: str
 
 function TransferHistory({ items }: { items: TransferView[] }) {
   return (
-    <Panel title="Lịch sử chuyển tiền">
+    <Panel title={msg().transfer.history}>
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Chưa có lần chuyển tiền nào.</p>
+        <p className="text-sm text-muted-foreground">{msg().transfer.noHistory}</p>
       ) : (
         <ul className="-mx-4 flex flex-col md:-mx-5">
           {items.map((t) => (
@@ -275,22 +277,22 @@ function WalletTransactions({ wallet }: { wallet: WalletSummary }) {
   const rows = (query.data ?? []).slice(0, 10);
   return (
     <Panel
-      title={`Giao dịch của ví ${wallet.name}`}
+      title={msg().recent.title(wallet.name)}
       description={
         <>
-          <span className="num">{wallet.transactionCount}</span> giao dịch · 10 giao dịch gần nhất
+          <span className="num">{wallet.transactionCount}</span> {msg().recent.count}
         </>
       }
       action={
         <Button variant="ghost" size="sm" asChild className="text-primary">
           <Link href={`/giao-dich?vi=${wallet.id}`}>
-            Xem tất cả <ArrowRight aria-hidden />
+            {msg().recent.viewAll} <ArrowRight aria-hidden />
           </Link>
         </Button>
       }
     >
       {query.error && !query.data ? (
-        <ErrorState title="Không tải được giao dịch của ví" error={query.error} onRetry={query.refetch} />
+        <ErrorState title={msg().recent.loadFailed} error={query.error} onRetry={query.refetch} />
       ) : query.loading ? (
         <div aria-hidden className="flex flex-col">
           {Array.from({ length: 6 }, (_, i) => (
@@ -298,16 +300,16 @@ function WalletTransactions({ wallet }: { wallet: WalletSummary }) {
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState icon={ReceiptText} title="Ví này chưa có giao dịch" description="Giao dịch ghi vào ví này sẽ hiện ở đây." />
+        <EmptyState icon={ReceiptText} title={msg().recent.emptyTitle} description={msg().recent.emptyText} />
       ) : (
         <div className="-mx-4 md:-mx-5">
-          <Table aria-label={`Giao dịch của ví ${wallet.name}`}>
+          <Table aria-label={msg().recent.title(wallet.name)}>
             <TableHeader className="bg-surface-subtle">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[112px] pl-5">Ngày</TableHead>
-                <TableHead>Mô tả</TableHead>
-                <TableHead className="w-[140px] max-md:hidden">Danh mục</TableHead>
-                <TableHead className="w-[130px] pr-5 text-right">Số tiền</TableHead>
+                <TableHead className="w-[112px] pl-5">{msg().recent.date}</TableHead>
+                <TableHead>{msg().recent.description}</TableHead>
+                <TableHead className="w-[140px] max-md:hidden">{msg().recent.category}</TableHead>
+                <TableHead className="w-[130px] pr-5 text-right">{msg().recent.amount}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -347,22 +349,22 @@ export function WalletsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Ví"
+        title={msg().title}
         description={
           list.length ? (
             <>
-              Tổng số dư <Money amount={total} className="font-semibold text-foreground" /> trên{" "}
-              <span className="num">{list.length}</span> ví
+              {msg().totalBefore} <Money amount={total} className="font-semibold text-foreground" /> {msg().totalOn}{" "}
+              <span className="num">{list.length}</span> {msg().wallets}
             </>
           ) : (
-            "Theo dõi số dư từng ví và chuyển tiền qua lại."
+            msg().intro
           )
         }
       />
 
       {wallets.error && !wallets.data ? (
         <section className="rounded-xl border bg-card">
-          <ErrorState title="Không tải được danh sách ví" error={wallets.error} onRetry={wallets.refetch} className="min-h-[360px]" />
+          <ErrorState title={msg().loadFailed} error={wallets.error} onRetry={wallets.refetch} className="min-h-[360px]" />
         </section>
       ) : wallets.loading ? (
         <div aria-hidden className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-6">
@@ -372,11 +374,11 @@ export function WalletsPage() {
         </div>
       ) : list.length === 0 ? (
         <section className="rounded-xl border bg-card">
-          <EmptyState icon={WalletIcon} className="min-h-[320px]" title="Chưa có ví nào" description="Tạo ví tiền mặt, tài khoản ngân hàng hoặc ví điện tử để bắt đầu." />
+          <EmptyState icon={WalletIcon} className="min-h-[320px]" title={msg().emptyTitle} description={msg().emptyText} />
         </section>
       ) : (
         <>
-          <div role="group" aria-label="Các ví" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-6">
+          <div role="group" aria-label={msg().group} className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:gap-6">
             {list.map((w) => (
               <WalletCard key={w.id} wallet={w} selected={w.id === selected?.id} onSelect={() => setSelectedId(w.id)} />
             ))}
@@ -388,8 +390,8 @@ export function WalletsPage() {
               {list.length >= 2 ? (
                 <TransferForm wallets={list} today={today} />
               ) : (
-                <Panel title="Chuyển tiền giữa các ví">
-                  <p className="text-sm text-muted-foreground">Cần ít nhất 2 ví để chuyển tiền.</p>
+                <Panel title={msg().transfer.title}>
+                  <p className="text-sm text-muted-foreground">{msg().transfer.needTwo}</p>
                 </Panel>
               )}
               {transfers.data && <TransferHistory items={transfers.data} />}

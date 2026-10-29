@@ -9,29 +9,33 @@ import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { notificationsMessages } from "@/i18n/messages/notifications";
 
-export const NOTIFICATION_FILTERS: { value: NotificationType | "all"; label: string }[] = [
-  { value: "all", label: "Tất cả" },
-  { value: "reminder", label: "Nhắc nhở" },
-  { value: "celebration", label: "Chúc mừng" },
-  { value: "budget_alert", label: "Ngân sách" },
-];
+const msg = () => getMessages(notificationsMessages);
 
-const TYPE_STYLE: Record<NotificationType, { icon: typeof Bell; label: string; className: string }> = {
-  reminder: { icon: Bell, label: "Nhắc nhở", className: "bg-accent text-primary" },
+const FILTER_VALUES: (NotificationType | "all")[] = ["all", "reminder", "celebration", "budget_alert"];
+
+/** Bộ lọc theo loại; nhãn theo ngôn ngữ đang dùng */
+export function notificationFilters(): { value: NotificationType | "all"; label: string }[] {
+  return FILTER_VALUES.map((value) => ({ value, label: msg().types[value] }));
+}
+
+const TYPE_STYLE: Record<NotificationType, { icon: typeof Bell; className: string }> = {
+  reminder: { icon: Bell, className: "bg-accent text-primary" },
   // Màu ấm chỉ dùng cho gamification (MASTER.md)
-  celebration: { icon: Trophy, label: "Chúc mừng", className: "bg-xp-soft text-xp-text" },
-  budget_alert: { icon: TriangleAlert, label: "Ngân sách", className: "bg-warning-soft text-warning" },
+  celebration: { icon: Trophy, className: "bg-xp-soft text-xp-text" },
+  budget_alert: { icon: TriangleAlert, className: "bg-warning-soft text-warning" },
 };
 
 /** "20:00" hôm nay · "Hôm qua, 20:00" · "05/10/2026, 21:10" */
 export function formatWhen(iso: string, today: string): string {
   const date = iso.slice(0, 10);
   const time = iso.slice(11, 16);
-  if (date === today) return `Hôm nay, ${time}`;
+  if (date === today) return msg().today(time);
   const y = new Date(`${today}T00:00:00Z`);
   y.setUTCDate(y.getUTCDate() - 1);
-  if (date === y.toISOString().slice(0, 10)) return `Hôm qua, ${time}`;
+  if (date === y.toISOString().slice(0, 10)) return msg().yesterday(time);
   return `${formatDate(date)}, ${time}`;
 }
 
@@ -76,8 +80,8 @@ export function NotificationList({
       <EmptyState
         icon={BellOff}
         className="py-10"
-        title="Chưa có thông báo nào"
-        description="Nhắc nhở giữ chuỗi và lời chúc mừng thành tích sẽ xuất hiện ở đây."
+        title={msg().emptyTitle}
+        description={msg().emptyText}
         action={emptyHint}
       />
     );
@@ -93,16 +97,16 @@ export function NotificationList({
             </span>
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="flex items-start justify-between gap-2">
-                <span className={cn("text-sm", n.isRead ? "font-medium" : "font-semibold")}>{n.title ?? t.label}</span>
+                <span className={cn("text-sm", n.isRead ? "font-medium" : "font-semibold")}>{n.title ?? msg().types[n.type]}</span>
                 {!n.isRead && (
                   <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary">
-                    <span className="sr-only">Chưa đọc</span>
+                    <span className="sr-only">{msg().unread}</span>
                   </span>
                 )}
               </span>
               <span className={cn("text-[13px] text-muted-foreground", dense && "line-clamp-2")}>{n.content}</span>
               <span className="num text-xs text-muted-foreground">
-                <span className="sr-only">{t.label} · </span>
+                <span className="sr-only">{msg().types[n.type]} · </span>
                 {formatWhen(n.createdAt, today)}
               </span>
             </span>

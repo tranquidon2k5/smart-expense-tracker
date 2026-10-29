@@ -27,9 +27,15 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { adminService } from "@/services";
 import { cn } from "@/lib/utils";
 import { AdminHeader } from "./admin-shell";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { adminMessages } from "@/i18n/messages/admin";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(adminMessages);
 
 const MAX = 200;
-const contextLabel = (c: MotivationContext) => adminService.MOTIVATION_CONTEXTS.find((x) => x.value === c)?.label ?? c;
+const contextLabel = (c: MotivationContext) => msg().motivation.contexts[c]?.label ?? c;
 
 /** Tô biến {name}, {streak}… để admin thấy chỗ sẽ được thay */
 function Highlighted({ text }: { text: string }) {
@@ -98,10 +104,10 @@ function MessageDialog({
     setError(null);
     try {
       await adminService.saveMotivationMessage({ id: editing?.id, context, template, isActive });
-      toast.success(editing ? "Đã lưu câu khích lệ" : "Đã thêm câu khích lệ");
+      toast.success(editing ? msg().motivation.saved : msg().motivation.added);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không lưu được");
+      setError(err instanceof Error ? te(err.message) : msg().saveFailed);
     } finally {
       setSaving(false);
     }
@@ -111,13 +117,13 @@ function MessageDialog({
     <Dialog open={open} onOpenChange={(o) => !saving && onOpenChange(o)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{editing ? "Sửa câu khích lệ" : "Thêm câu khích lệ"}</DialogTitle>
-          <DialogDescription>Giọng tích cực, không trách móc (PRD §6.1). Hệ thống ưu tiên câu chưa hiện trong 7 ngày để tránh lặp.</DialogDescription>
+          <DialogTitle>{editing ? msg().motivation.editTitle : msg().motivation.addTitle}</DialogTitle>
+          <DialogDescription>{msg().motivation.dialogText}</DialogDescription>
         </DialogHeader>
         <form id="motivation-form" noValidate onSubmit={submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="mm-context" className="text-[13px]">
-              Ngữ cảnh
+              {msg().motivation.context}
             </Label>
             <Select value={context} onValueChange={(v) => setContext(v as MotivationContext)}>
               <SelectTrigger id="mm-context" className="w-full" aria-describedby="mm-context-help">
@@ -126,20 +132,20 @@ function MessageDialog({
               <SelectContent>
                 {adminService.MOTIVATION_CONTEXTS.map((c) => (
                   <SelectItem key={c.value} value={c.value}>
-                    {c.label}
+                    {contextLabel(c.value)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p id="mm-context-help" className="text-xs text-muted-foreground">
-              Hiện khi: {adminService.MOTIVATION_CONTEXTS.find((c) => c.value === context)?.when}
+              {msg().motivation.showsWhen} {msg().motivation.contexts[context]?.when}
             </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="mm-template" className="text-[13px]">
-                Nội dung
+                {msg().motivation.content}
               </Label>
               <span className={cn("num text-xs", template.length >= MAX ? "text-danger" : "text-muted-foreground")} aria-live="polite">
                 {template.length}/{MAX}
@@ -154,17 +160,17 @@ function MessageDialog({
               onChange={(e) => setTemplate(e.target.value)}
               aria-invalid={bad.length > 0 || !!error}
               aria-describedby="mm-vars"
-              placeholder="Vd. Chào {name}! Chuỗi của bạn đang là {streak} ngày, giữ lửa nhé."
+              placeholder={msg().motivation.placeholder}
             />
             <div id="mm-vars" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-              Chèn biến:
+              {msg().motivation.insertVar}
               {adminService.MOTIVATION_VARIABLES.map((v) => (
                 <button
                   key={v.key}
                   type="button"
                   onClick={() => insert(v.key)}
                   className="rounded-md border px-1.5 py-0.5 font-mono text-xs text-primary transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                  title={v.label}
+                  title={msg().motivation.variables[v.key] ?? v.label}
                 >
                   {v.key}
                 </button>
@@ -172,20 +178,20 @@ function MessageDialog({
             </div>
             {bad.length > 0 && (
               <p className="flex items-center gap-1 text-xs text-danger">
-                <CircleAlert aria-hidden className="size-3.5" /> Biến không hỗ trợ: {bad.join(", ")}
+                <CircleAlert aria-hidden className="size-3.5" /> {msg().motivation.badVars} {bad.join(", ")}
               </p>
             )}
           </div>
 
           <div className="rounded-lg bg-accent px-3 py-2.5">
-            <p className="text-xs font-medium text-muted-foreground">Xem trước (dữ liệu mẫu)</p>
+            <p className="text-xs font-medium text-muted-foreground">{msg().motivation.preview}</p>
             <p className="mt-1 text-sm">{template.trim() ? adminService.previewTemplate(template) : "—"}</p>
           </div>
 
           <div className="flex items-center gap-2">
             <Switch id="mm-active" checked={isActive} onCheckedChange={setIsActive} />
             <Label htmlFor="mm-active" className="text-sm font-normal">
-              Đang dùng
+              {msg().active}
             </Label>
           </div>
 
@@ -198,11 +204,11 @@ function MessageDialog({
         </form>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Huỷ
+            {getMessages(commonMessages).cancel}
           </Button>
           <Button type="submit" form="motivation-form" disabled={saving || bad.length > 0}>
             {saving && <Loader2 aria-hidden className="motion-safe:animate-spin" />}
-            {editing ? "Lưu" : "Thêm câu"}
+            {editing ? msg().save : msg().motivation.add}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -211,7 +217,7 @@ function MessageDialog({
 }
 
 export function MotivationPage() {
-  const list = useServiceQuery(() => adminService.listMotivationMessages());
+  const list = useServiceQuery(() => adminService.listMotivationMessages(), "", { raw: true });
   const [contextFilter, setContextFilter] = React.useState<MotivationContext | "all">("all");
   const [dialog, setDialog] = React.useState<{ open: boolean; editing: MotivationMessage | null }>({ open: false, editing: null });
   const [deleting, setDeleting] = React.useState<MotivationMessage | null>(null);
@@ -227,9 +233,9 @@ export function MotivationPage() {
   const toggle = async (m: MotivationMessage, isActive: boolean) => {
     try {
       await adminService.setMotivationActive(m.id, isActive);
-      toast.success(isActive ? "Đã bật câu" : "Đã tắt câu");
+      toast.success(isActive ? msg().motivation.turnedOn : msg().motivation.turnedOff);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không cập nhật được");
+      toast.error(e instanceof Error ? te(e.message) : msg().updateFailed);
     }
   };
 
@@ -238,10 +244,10 @@ export function MotivationPage() {
     setBusy(true);
     try {
       await adminService.deleteMotivationMessage(deleting.id);
-      toast.success("Đã xoá câu khích lệ");
+      toast.success(msg().motivation.deleted);
       setDeleting(null);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không xoá được");
+      toast.error(e instanceof Error ? te(e.message) : msg().deleteFailed);
     } finally {
       setBusy(false);
     }
@@ -250,28 +256,28 @@ export function MotivationPage() {
   return (
     <>
       <AdminHeader
-        title="Câu khích lệ"
-        description={list.data ? `${list.data.length} câu · ${list.data.filter((m) => m.isActive).length} đang dùng · mỗi ngữ cảnh cần ít nhất 1 câu đang bật` : "Ngân hàng câu theo ngữ cảnh (PRD §6.3)"}
+        title={msg().motivation.title}
+        description={list.data ? msg().motivation.count(list.data.length, list.data.filter((m) => m.isActive).length) : msg().motivation.intro}
         actions={
           <Button size="sm" onClick={() => setDialog({ open: true, editing: null })}>
-            <Plus aria-hidden /> Thêm câu
+            <Plus aria-hidden /> {msg().motivation.add}
           </Button>
         }
       />
       <Panel className="p-0 md:p-0">
         <div className="flex items-center gap-2 border-b px-3 py-2.5">
           <Label htmlFor="mm-filter" className="text-[13px] text-muted-foreground">
-            Ngữ cảnh
+            {msg().motivation.context}
           </Label>
           <Select value={contextFilter} onValueChange={(v) => setContextFilter(v as MotivationContext | "all")}>
             <SelectTrigger id="mm-filter" size="sm" className="w-60">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tất cả ngữ cảnh</SelectItem>
+              <SelectItem value="all">{msg().motivation.allContexts}</SelectItem>
               {adminService.MOTIVATION_CONTEXTS.map((c) => (
                 <SelectItem key={c.value} value={c.value}>
-                  {c.label}
+                  {contextLabel(c.value)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -280,14 +286,14 @@ export function MotivationPage() {
         {list.error ? (
           <ErrorState error={list.error} onRetry={list.refetch} />
         ) : (
-          <Table aria-label="Ngân hàng câu khích lệ">
+          <Table aria-label={msg().motivation.tableLabel}>
             <TableHeader className="bg-surface-subtle">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-48">Ngữ cảnh</TableHead>
-                <TableHead>Nội dung</TableHead>
-                <TableHead className="w-24">Đang dùng</TableHead>
+                <TableHead className="w-48">{msg().motivation.context}</TableHead>
+                <TableHead>{msg().motivation.content}</TableHead>
+                <TableHead className="w-24">{msg().active}</TableHead>
                 <TableHead className="w-24 text-right">
-                  <span className="sr-only">Thao tác</span>
+                  <span className="sr-only">{getMessages(commonMessages).actions}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -307,18 +313,18 @@ export function MotivationPage() {
                         <Highlighted text={m.template} />
                       </TableCell>
                       <TableCell>
-                        <Switch checked={m.isActive} onCheckedChange={(v) => void toggle(m, v)} aria-label={`Dùng câu: ${m.template}`} />
+                        <Switch checked={m.isActive} onCheckedChange={(v) => void toggle(m, v)} aria-label={msg().motivation.useLabel(m.template)} />
                       </TableCell>
                       <TableCell className="text-right">
                         <span className="inline-flex gap-0.5">
-                          <Button size="icon-xs" variant="ghost" aria-label="Sửa câu" title="Sửa" onClick={() => setDialog({ open: true, editing: m })} className="max-md:size-9">
+                          <Button size="icon-xs" variant="ghost" aria-label={msg().motivation.editLabel} title={msg().edit} onClick={() => setDialog({ open: true, editing: m })} className="max-md:size-9">
                             <Pencil aria-hidden />
                           </Button>
                           <Button
                             size="icon-xs"
                             variant="ghost"
-                            aria-label="Xoá câu"
-                            title="Xoá"
+                            aria-label={msg().motivation.deleteLabel}
+                            title={msg().delete}
                             onClick={() => setDeleting(m)}
                             className="text-danger hover:bg-expense-soft hover:text-danger max-md:size-9"
                           >
@@ -343,14 +349,14 @@ export function MotivationPage() {
       <AlertDialog open={!!deleting} onOpenChange={(o) => !o && !busy && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xoá câu khích lệ này?</AlertDialogTitle>
+            <AlertDialogTitle>{msg().motivation.confirmTitle}</AlertDialogTitle>
             <AlertDialogDescription>“{deleting?.template}”</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Giữ lại</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{msg().keep}</AlertDialogCancel>
             <Button disabled={busy} onClick={() => void remove()} className="bg-danger text-white hover:bg-danger/90">
               {busy && <Loader2 aria-hidden className="motion-safe:animate-spin" />}
-              Xoá câu
+              {msg().motivation.confirmDelete}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

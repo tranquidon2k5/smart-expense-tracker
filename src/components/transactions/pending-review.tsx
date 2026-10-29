@@ -18,6 +18,11 @@ import { cn } from "@/lib/utils";
 import { XP_LIMIT_NOTE, xpSuffix } from "@/lib/xp";
 import { CategoryCommand } from "./category-command";
 import { RuleSuggestionPrompt } from "./rule-suggestion";
+import { getMessages } from "@/i18n/core";
+import { transactionsMessages } from "@/i18n/messages/transactions";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(transactionsMessages);
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return <kbd className="num inline-flex min-w-5 justify-center rounded border bg-card px-1 text-[11px] font-medium">{children}</kbd>;
@@ -67,13 +72,13 @@ export function PendingReview({
     try {
       const result = await transactionService.reviewTransaction(t.id, categoryId);
       setReviewedCount((n) => n + 1);
-      toast.success(`Đã duyệt “${t.description}”${xpSuffix(result)}`, {
+      toast.success(`${msg().review.done(t.description)}${xpSuffix(result)}`, {
         description: result.xpLimitReached ? XP_LIMIT_NOTE.review : undefined,
       });
       restoreFocus.current = true;
       if (result.ruleSuggestion) setSuggestion(result.ruleSuggestion);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Duyệt chưa thành công, bạn thử lại nhé.");
+      toast.error(e instanceof Error ? te(e.message) : msg().review.failed);
     } finally {
       setBusyId(null);
     }
@@ -114,7 +119,7 @@ export function PendingReview({
   };
 
   if (query.error && !query.data) {
-    return <ErrorState title="Không tải được hàng chờ duyệt" error={query.error} onRetry={query.refetch} className="min-h-[360px]" />;
+    return <ErrorState title={msg().review.loadFailed} error={query.error} onRetry={query.refetch} className="min-h-[360px]" />;
   }
 
   if (query.loading) {
@@ -139,21 +144,21 @@ export function PendingReview({
     <div className="flex flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 md:px-5">
         <p className="text-sm text-muted-foreground">
-          AI chưa chắc chắn về các giao dịch dưới đây (độ tin cậy dưới <span className="num">70%</span>). Mỗi lần duyệt được{" "}
+          {msg().review.introBefore} <span className="num">70%</span>{msg().review.introAfter}{" "}
           <span className="num font-medium text-xp-text">+5 XP</span>.
         </p>
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground max-md:hidden" aria-label="Phím tắt">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground max-md:hidden" aria-label={msg().review.shortcuts}>
           <span>
-            <Kbd>↑</Kbd> <Kbd>↓</Kbd> chọn
+            <Kbd>↑</Kbd> <Kbd>↓</Kbd> {msg().review.keySelect}
           </span>
           <span>
-            <Kbd>Enter</Kbd> duyệt
+            <Kbd>Enter</Kbd> {msg().review.keyReview}
           </span>
           <span>
-            <Kbd>E</Kbd> đổi danh mục
+            <Kbd>E</Kbd> {msg().review.keyCategory}
           </span>
           <span>
-            <Kbd>O</Kbd> xem chi tiết
+            <Kbd>O</Kbd> {msg().review.keyOpen}
           </span>
         </p>
       </div>
@@ -175,17 +180,17 @@ export function PendingReview({
         <EmptyState
           icon={CheckCheck}
           className="min-h-[320px]"
-          title={reviewedCount ? "Duyệt xong hết rồi, giỏi lắm!" : "Không có giao dịch nào chờ duyệt"}
+          title={reviewedCount ? msg().review.allDoneTitle : msg().review.emptyTitle}
           description={
             reviewedCount
-              ? `Bạn vừa duyệt ${reviewedCount} giao dịch. AI sẽ phân loại chính xác hơn nhờ các luật bạn tạo.`
-              : "Khi AI chưa chắc chắn về danh mục của một giao dịch, nó sẽ xuất hiện ở đây để bạn kiểm tra."
+              ? msg().review.allDoneText(reviewedCount)
+              : msg().review.emptyText
           }
         />
       ) : (
         <ul
           ref={listRef}
-          aria-label={`${items.length} giao dịch chờ duyệt. Dùng mũi tên để chọn, Enter để duyệt, E để đổi danh mục`}
+          aria-label={msg().review.listLabel(items.length)}
           onKeyDown={onListKeyDown}
           className={cn("flex flex-col", query.fetching && "opacity-80 transition-opacity")}
         >
@@ -201,7 +206,7 @@ export function PendingReview({
                 }}
                 tabIndex={isActive ? 0 : -1}
                 aria-current={isActive || undefined}
-                aria-label={`${t.description}, ${t.type === "income" ? "thu" : "chi"} ${t.amount} đồng, ngày ${formatDate(t.date)}, AI đoán ${t.category.name} ${formatPercent((t.aiConfidence ?? 0) * 100)}`}
+                aria-label={msg().review.itemLabel(t.description, t.type === "income", t.amount, formatDate(t.date), t.category.name, formatPercent((t.aiConfidence ?? 0) * 100))}
                 onFocus={() => setActiveIndex(i)}
                 onClick={() => setActiveIndex(i)}
                 className={cn(
@@ -218,7 +223,7 @@ export function PendingReview({
                     {t.description}
                   </p>
                   <p className="mt-0.5 text-[13px] text-muted-foreground">
-                    <span className="num">{formatDate(t.date)}</span> · {t.wallet.name} · {t.source === "csv" ? "Sao kê CSV" : "Câu tự nhiên"}
+                    <span className="num">{formatDate(t.date)}</span> · {t.wallet.name} · {t.source === "csv" ? msg().sourceCsv : msg().sourceNlp}
                   </p>
                 </div>
                 <Money amount={t.amount} type={t.type} className="w-28 font-medium md:text-right" />
@@ -226,7 +231,7 @@ export function PendingReview({
                   <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-card px-2 py-1 text-[13px] ring-1 ring-border max-md:flex-1 md:w-52">
                     <Sparkles aria-hidden className="size-3.5 shrink-0 text-info" />
                     <span className="min-w-0 flex-1 truncate">
-                      AI đoán: <span className="font-medium">{t.category.name}</span>
+                      {msg().review.aiGuess} <span className="font-medium">{t.category.name}</span>
                     </span>
                     <span className="num shrink-0 text-warning">{formatPercent((t.aiConfidence ?? 0) * 100)}</span>
                   </span>
@@ -238,8 +243,8 @@ export function PendingReview({
                         tabIndex={isActive ? 0 : -1}
                         onClick={() => setPickerFor(t.id)}
                         disabled={busy}
-                        aria-label={`Đổi danh mục cho ${t.description} (phím E)`}
-                        title="Đổi danh mục (E)"
+                        aria-label={msg().review.changeFor(t.description)}
+                        title={msg().review.changeTitle}
                         className="max-md:size-11"
                       >
                         <PencilLine aria-hidden />
@@ -256,7 +261,7 @@ export function PendingReview({
                       <CategoryCommand
                         categories={categories}
                         value={t.categoryId}
-                        placeholder="Chọn danh mục đúng…"
+                        placeholder={msg().review.pickPlaceholder}
                         onSelect={(c) => {
                           setPickerFor(null);
                           approve(t, c.id);
@@ -269,11 +274,11 @@ export function PendingReview({
                     onClick={() => approve(t)}
                     disabled={busy}
                     aria-busy={busy}
-                    aria-label={`Duyệt ${t.description} với danh mục ${t.category.name} (Enter)`}
+                    aria-label={msg().review.approveLabel(t.description, t.category.name)}
                     className="max-md:h-11"
                   >
                     {busy ? <Loader2 aria-hidden className="animate-spin" /> : <Check aria-hidden />}
-                    Duyệt
+                    {msg().review.approve}
                   </Button>
                 </div>
               </li>

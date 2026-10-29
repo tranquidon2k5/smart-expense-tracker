@@ -6,6 +6,11 @@ import type { QuickEntryPreview } from "@/types";
 import { transactionService } from "@/services";
 import { formatMoney } from "@/lib/format";
 import { XP_LIMIT_NOTE, xpSuffix } from "@/lib/xp";
+import { getMessages } from "@/i18n/core";
+import { quickAddMessages } from "@/i18n/messages/quick-add";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(quickAddMessages);
 
 type Status = "idle" | "parsing" | "preview" | "saving";
 
@@ -19,7 +24,7 @@ export function useQuickEntry(onSaved?: () => void) {
   const parse = React.useCallback(async () => {
     const value = text.trim();
     if (!value) {
-      setError("Gõ một câu, ví dụ: hôm qua ăn phở 45k với Nam");
+      setError(msg().emptyText);
       return;
     }
     setError(null);
@@ -31,21 +36,21 @@ export function useQuickEntry(onSaved?: () => void) {
     } catch {
       // PRD §8: AI lỗi vẫn cho nhập tay — mở preview trống để người dùng tự điền
       setStatus("idle");
-      setError("Chưa phân tích được câu này. Bạn thử ghi rõ số tiền, ví dụ 45k.");
+      setError(msg().parseFailed);
     }
   }, [text]);
 
   const save = React.useCallback(async () => {
     if (!preview) return;
     if (!preview.amount || preview.amount <= 0) {
-      setError("Nhập số tiền lớn hơn 0đ");
+      setError(msg().amountRequired(formatMoney(0)));
       return;
     }
     setError(null);
     setStatus("saving");
     try {
       const result = await transactionService.createFromQuickEntry(preview);
-      toast.success(`Đã lưu ${formatMoney(result.transaction.amount)}${xpSuffix(result)}`, {
+      toast.success(`${msg().saved(formatMoney(result.transaction.amount))}${xpSuffix(result)}`, {
         description: result.xpLimitReached ? XP_LIMIT_NOTE.add_transaction : result.message,
       });
       setText("");
@@ -54,7 +59,7 @@ export function useQuickEntry(onSaved?: () => void) {
       onSaved?.();
     } catch (e) {
       setStatus("preview");
-      setError(e instanceof Error ? e.message : "Lưu chưa thành công, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().saveFailed);
     }
   }, [preview, onSaved]);
 

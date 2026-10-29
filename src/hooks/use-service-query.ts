@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { onDataChanged } from "@/services";
+import { localizeData } from "@/i18n/content";
 
 export interface QueryState<T> {
   data: T | undefined;
@@ -16,13 +17,17 @@ export interface QueryState<T> {
 /**
  * Gọi một hàm service, tự tải lại khi dữ liệu thay đổi (vd. vừa ghi giao dịch)
  * hoặc khi `key` đổi (vd. bộ lọc). `key` nên là chuỗi mô tả tham số của fetcher.
+ *
+ * Tên mặc định trong dữ liệu (danh mục, nhiệm vụ, huy hiệu…) được dịch theo ngôn ngữ giao diện;
+ * trang Quản trị truyền `{ raw: true }` để sửa đúng bản gốc trong database.
  */
-export function useServiceQuery<T>(fetcher: () => Promise<T>, key = ""): QueryState<T> {
+export function useServiceQuery<T>(fetcher: () => Promise<T>, key = "", options: { raw?: boolean } = {}): QueryState<T> {
   const [data, setData] = React.useState<T>();
   const [error, setError] = React.useState<Error>();
   const [fetching, setFetching] = React.useState(true);
   const fetcherRef = React.useRef(fetcher);
   const runIdRef = React.useRef(0);
+  const rawRef = React.useRef(options.raw);
   React.useLayoutEffect(() => {
     fetcherRef.current = fetcher;
   });
@@ -34,7 +39,7 @@ export function useServiceQuery<T>(fetcher: () => Promise<T>, key = ""): QuerySt
       .current()
       .then((result) => {
         if (runId !== runIdRef.current) return;
-        setData(result);
+        setData(rawRef.current ? result : localizeData(result));
         setError(undefined);
       })
       .catch((e: unknown) => {

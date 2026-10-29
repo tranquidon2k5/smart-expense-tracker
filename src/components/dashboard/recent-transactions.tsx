@@ -11,17 +11,21 @@ import { EmptyState } from "@/components/empty-state";
 import { Money } from "@/components/money";
 import { Panel } from "@/components/panel";
 import { formatDate, formatPercent } from "@/lib/format";
+import { getMessages } from "@/i18n/core";
+import { dashboardMessages } from "@/i18n/messages/dashboard";
+
+const t = () => getMessages(dashboardMessages);
 
 /** Chip ngắn để không chiếm chỗ mô tả; độ tin cậy AI nằm trong tooltip + nhãn đọc màn hình */
 function PendingChip({ confidence }: { confidence: number | null }) {
-  const detail = confidence != null ? `AI chưa chắc chắn, độ tin cậy ${formatPercent(confidence * 100)}` : "AI chưa chắc chắn";
+  const detail = confidence != null ? t().recent.aiUnsureConfidence(formatPercent(confidence * 100)) : t().recent.aiUnsure;
   return (
     <span
       title={detail}
       className="inline-flex shrink-0 items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-xs font-medium text-info"
     >
       <Sparkles aria-hidden className="size-3" />
-      Chờ duyệt
+      {t().recent.pending}
       <span className="sr-only"> — {detail}</span>
     </span>
   );
@@ -30,8 +34,8 @@ function PendingChip({ confidence }: { confidence: number | null }) {
 function AiMark({ t }: { t: TransactionView }) {
   if (t.source !== "nlp" || t.status === "pending") return null;
   return (
-    <span title="Ghi bằng câu tự nhiên, AI phân loại" className="inline-flex text-muted-foreground">
-      <Sparkles aria-label="AI phân loại" className="size-3.5" />
+    <span title={getMessages(dashboardMessages).recent.aiTitle} className="inline-flex text-muted-foreground">
+      <Sparkles aria-label={getMessages(dashboardMessages).recent.aiLabel} className="size-3.5" />
     </span>
   );
 }
@@ -50,13 +54,13 @@ export function RecentTransactions({
   const rows = data ?? [];
   return (
     <Panel
-      title="Giao dịch gần đây"
+      title={t().recent.title}
       className={className}
       action={
         rows.length > 0 && (
           <Button variant="ghost" size="sm" asChild className="text-primary">
             <Link href="/giao-dich">
-              Xem tất cả <ArrowRight aria-hidden />
+              {t().recent.viewAll} <ArrowRight aria-hidden />
             </Link>
           </Button>
         )
@@ -77,22 +81,22 @@ export function RecentTransactions({
         <EmptyState
           icon={ReceiptText}
           className="min-h-[280px]"
-          title="Chưa có giao dịch nào"
-          description="Gõ một câu như “ăn phở 45k” vào ô Ghi nhanh, AI sẽ lo phần còn lại."
-          action={<Button onClick={onAddFirst}>Ghi giao dịch đầu tiên</Button>}
+          title={t().recent.emptyTitle}
+          description={t().recent.emptyText}
+          action={<Button onClick={onAddFirst}>{t().recent.addFirst}</Button>}
         />
       ) : (
         <>
           {/* ≥ 768px: bảng */}
           <div className="-mx-4 max-md:hidden md:-mx-5">
-            <Table aria-label="Giao dịch gần đây">
+            <Table aria-label={t().recent.title}>
               <TableHeader className="bg-surface-subtle">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[112px] pl-5">Ngày</TableHead>
-                  <TableHead>Mô tả</TableHead>
-                  <TableHead className="w-[132px]">Danh mục</TableHead>
-                  <TableHead className="w-[120px] max-lg:hidden">Ví</TableHead>
-                  <TableHead className="w-[136px] pr-5 text-right">Số tiền</TableHead>
+                  <TableHead className="w-[112px] pl-5">{t().recent.date}</TableHead>
+                  <TableHead>{t().recent.description}</TableHead>
+                  <TableHead className="w-[132px]">{t().recent.category}</TableHead>
+                  <TableHead className="w-[120px] max-lg:hidden">{t().recent.wallet}</TableHead>
+                  <TableHead className="w-[136px] pr-5 text-right">{t().recent.amount}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -122,7 +126,7 @@ export function RecentTransactions({
           </div>
 
           {/* < 768px: danh sách 2 dòng, không cuộn ngang */}
-          <ul className="-mx-4 md:hidden" aria-label="Giao dịch gần đây">
+          <ul className="-mx-4 md:hidden" aria-label={t().recent.title}>
             {rows.map((t) => (
               <li key={t.id} className="flex min-h-14 items-center gap-3 border-b px-4 py-2 last:border-0">
                 <CategoryIcon icon={t.category.icon} color={t.category.color} />

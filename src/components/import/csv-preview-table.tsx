@@ -2,6 +2,10 @@ import type { CsvColumnMapping, ImportField, ParsedCsv } from "@/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { importService } from "@/services";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { importMessages } from "@/i18n/messages/import";
+
+const msg = () => getMessages(importMessages);
 
 /**
  * Bảng xem trước dữ liệu thô của file, kèm số dòng trong file.
@@ -23,10 +27,10 @@ export function CsvPreviewTable({
     mapping ? importService.IMPORT_FIELDS.find((f) => mapping[f] === col) : undefined;
 
   return (
-    <Table aria-label={`${limit} dòng đầu của file ${parsed.fileName}`} containerClassName="rounded-lg border">
+    <Table aria-label={msg().previewLabel(limit, parsed.fileName)} containerClassName="rounded-lg border">
       <TableHeader>
         <TableRow className="bg-surface-subtle hover:bg-surface-subtle">
-          <TableHead className="w-16 px-3 text-right">Dòng</TableHead>
+          <TableHead className="w-16 px-3 text-right">{msg().row}</TableHead>
           {parsed.headers.map((h, i) => {
             const field = fieldOf(i);
             return (
@@ -34,7 +38,7 @@ export function CsvPreviewTable({
                 <span className="flex flex-col gap-0.5 py-1">
                   {field && (
                     <span className="w-fit rounded-md bg-accent px-1.5 text-[11px] leading-[18px] font-semibold text-primary">
-                      {importService.FIELD_LABEL[field]}
+                      {msg().fields[field]}
                     </span>
                   )}
                   {h}
@@ -51,7 +55,7 @@ export function CsvPreviewTable({
           return (
             <TableRow key={line} className={cn(bad && "bg-expense-soft/60 hover:bg-expense-soft/60")}>
               <TableCell className="num px-3 text-right text-muted-foreground">
-                {bad && <span className="mr-1 text-[11px] font-semibold text-danger">Lỗi</span>}
+                {bad && <span className="mr-1 text-[11px] font-semibold text-danger">{msg().error}</span>}
                 {line}
               </TableCell>
               {row.map((cell, c) => (
@@ -60,7 +64,7 @@ export function CsvPreviewTable({
                   title={cell}
                   className={cn("max-w-[260px] truncate px-3", fieldOf(c) && "font-medium", /^[-+(]?\d/.test(cell) && "num")}
                 >
-                  {cell || <span className="text-muted-foreground">(trống)</span>}
+                  {cell || <span className="text-muted-foreground">{msg().empty}</span>}
                 </TableCell>
               ))}
             </TableRow>

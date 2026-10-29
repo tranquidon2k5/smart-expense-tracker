@@ -7,10 +7,13 @@ import * as React from "react";
 import { useQuickAdd } from "@/components/quick-add/quick-add-provider";
 import { NAV_MOBILE } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/provider";
+import { shellMessages } from "@/i18n/messages/shell";
 
 /** Bottom nav < 768px: 4 mục + nút Ghi nhanh ở giữa, có nhãn chữ, tôn trọng safe-area */
 function BottomNavItems({ pathname }: { pathname: string | null }) {
   const { openQuickAdd } = useQuickAdd();
+  const t = useT(shellMessages);
   const [first, second, third, fourth] = NAV_MOBILE;
 
   const item = (n: (typeof NAV_MOBILE)[number]) => {
@@ -39,7 +42,7 @@ function BottomNavItems({ pathname }: { pathname: string | null }) {
         <button
           type="button"
           onClick={openQuickAdd}
-          aria-label="Ghi nhanh giao dịch"
+          aria-label={t.quickAddAria}
           className="-mt-5 inline-flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_4px_12px_rgb(19_42_38/0.16)] transition-colors duration-150 hover:bg-primary-hover"
         >
           <Plus aria-hidden className="size-6" />
@@ -56,9 +59,10 @@ function ActiveBottomNavItems() {
 }
 
 export function BottomNav() {
+  const t = useT(shellMessages);
   return (
     <nav
-      aria-label="Điều hướng nhanh"
+      aria-label={t.quickNav}
       className="fixed inset-x-0 bottom-0 z-40 border-t bg-card pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_2px_rgb(19_42_38/0.06)] md:hidden"
     >
       {/* usePathname cần Suspense khi có Cache Components */}

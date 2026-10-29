@@ -9,11 +9,15 @@ import { EmptyState } from "@/components/empty-state";
 import { Panel } from "@/components/panel";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { dashboardMessages } from "@/i18n/messages/dashboard";
+
+const t = () => getMessages(dashboardMessages);
 
 /** Câu khích lệ hôm nay — khối phẳng nền primary-soft (PRD §6.6) */
 export function MotivationCard({ message, loading }: { message?: string; loading: boolean }) {
   return (
-    <section aria-label="Câu khích lệ hôm nay" className="flex gap-3 rounded-xl bg-accent p-4 md:p-5">
+    <section aria-label={t().motivation} className="flex gap-3 rounded-xl bg-accent p-4 md:p-5">
       <Sparkles aria-hidden className="mt-0.5 size-5 shrink-0 text-primary" />
       {loading || !message ? (
         <div aria-hidden className="flex flex-1 flex-col gap-2">
@@ -31,11 +35,11 @@ export function MissionsPanel({ data, loading }: { data?: MissionProgress[]; loa
   const done = data?.filter((m) => m.completed).length ?? 0;
   return (
     <Panel
-      title="Nhiệm vụ hôm nay"
+      title={t().missions.title}
       icon={<ListChecks aria-hidden className="size-5 text-muted-foreground" />}
       action={
         data && (
-          <span className="num text-[13px] text-muted-foreground" aria-label={`Đã xong ${done} trên ${data.length} nhiệm vụ`}>
+          <span className="num text-[13px] text-muted-foreground" aria-label={t().missions.doneOf(done, data.length)}>
             {done}/{data.length}
           </span>
         )
@@ -57,7 +61,7 @@ export function MissionsPanel({ data, loading }: { data?: MissionProgress[]; loa
                 <Circle aria-hidden className="size-5 shrink-0 text-input" />
               )}
               <span className={cn("min-w-0 flex-1 text-sm", completed && "text-muted-foreground line-through decoration-1")}>
-                <span className="sr-only">{completed ? "Đã xong: " : "Chưa xong: "}</span>
+                <span className="sr-only">{completed ? t().missions.done : t().missions.notDone}</span>
                 {mission.title}
               </span>
               <span className="num shrink-0 text-xs text-muted-foreground">
@@ -88,17 +92,17 @@ function BudgetRow({ item }: { item: BudgetProgress }) {
           <span className="truncate">{item.category.name}</span>
         </span>
         <span className={cn("num shrink-0 text-[13px] font-medium", over ? "text-danger" : warn ? "text-warning" : "text-muted-foreground")}>
-          {over ? "Vượt " : "Đã dùng "}
+          {over ? t().budgets.over : t().budgets.used}
           {formatPercent(pct)}
         </span>
       </div>
       <div
         role="progressbar"
-        aria-label={`Ngân sách ${item.category.name}`}
+        aria-label={t().budgets.aria(item.category.name)}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(pct)}
-        aria-valuetext={`Đã dùng ${formatMoney(item.spent)} trên ${formatMoney(item.budget.limitAmount)}, ${formatPercent(pct)}`}
+        aria-valuetext={t().budgets.valueText(formatMoney(item.spent), formatMoney(item.budget.limitAmount), formatPercent(pct))}
         className="h-2 overflow-hidden rounded-full bg-muted"
       >
         <div className={cn("h-full rounded-full", bar)} style={{ width: `${Math.min(100, pct)}%` }} />
@@ -113,12 +117,12 @@ function BudgetRow({ item }: { item: BudgetProgress }) {
 export function BudgetWatchPanel({ data, loading }: { data?: BudgetProgress[]; loading: boolean }) {
   return (
     <Panel
-      title="Ngân sách tháng này"
+      title={t().budgets.title}
       icon={<PiggyBank aria-hidden className="size-5 text-muted-foreground" />}
       action={
         data && data.length > 0 && (
           <Button variant="ghost" size="sm" asChild className="text-primary">
-            <Link href="/ngan-sach">Chi tiết</Link>
+            <Link href="/ngan-sach">{t().budgets.details}</Link>
           </Button>
         )
       }
@@ -136,11 +140,11 @@ export function BudgetWatchPanel({ data, loading }: { data?: BudgetProgress[]; l
         <EmptyState
           icon={PiggyBank}
           className="py-6"
-          title="Chưa đặt ngân sách"
-          description="Đặt hạn mức cho vài danh mục để biết khi nào cần chậm lại."
+          title={t().budgets.emptyTitle}
+          description={t().budgets.emptyText}
           action={
             <Button variant="secondary" asChild>
-              <Link href="/ngan-sach">Đặt ngân sách</Link>
+              <Link href="/ngan-sach">{t().budgets.set}</Link>
             </Button>
           }
         />

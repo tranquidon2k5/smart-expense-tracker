@@ -11,8 +11,14 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { transactionService } from "@/services";
 import { formatDate, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getActiveLocale, getMessages, INTL_LOCALE } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { quickAddMessages } from "@/i18n/messages/quick-add";
 
-const vnd = new Intl.NumberFormat("vi-VN");
+const msg = () => getMessages(quickAddMessages);
+
+/** Dấu phân cách nghìn theo ngôn ngữ giao diện */
+const vnd = { format: (n: number) => new Intl.NumberFormat(INTL_LOCALE[getActiveLocale()]).format(n) };
 
 function addDays(iso: string, delta: number) {
   const [y, m, d] = iso.split("-").map(Number);
@@ -56,13 +62,13 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
         onSave();
       }}
       className="flex flex-col gap-4"
-      aria-label="Xem trước giao dịch"
+      aria-label={msg().previewTitle}
     >
       {/* Số tiền + loại */}
       <div className="flex items-end gap-3">
         <div className="min-w-0 flex-1">
           <label htmlFor={`${ids}-amount`} className="mb-1.5 block text-[13px] font-medium">
-            Số tiền
+            {msg().amount}
           </label>
           <div className="relative">
             <Input
@@ -81,11 +87,11 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
               )}
             />
             <span aria-hidden className="num pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground">
-              đ
+              {getMessages(commonMessages).currencySuffix}
             </span>
           </div>
         </div>
-        <div role="group" aria-label="Loại giao dịch" className="flex shrink-0 rounded-lg border p-0.5">
+        <div role="group" aria-label={msg().type} className="flex shrink-0 rounded-lg border p-0.5">
           {(["expense", "income"] as const).map((t) => {
             const active = preview.type === t;
             const Icon = t === "income" ? ArrowDownLeft : ArrowUpRight;
@@ -105,7 +111,7 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
                 )}
               >
                 <Icon aria-hidden className="size-4" />
-                {t === "income" ? "Thu" : "Chi"}
+                {t === "income" ? getMessages(commonMessages).income : getMessages(commonMessages).expense}
               </button>
             );
           })}
@@ -116,7 +122,7 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <label htmlFor={`${ids}-cat`} className="text-[13px] font-medium">
-            Danh mục
+            {msg().category}
           </label>
           <span
             className={cn(
@@ -125,12 +131,12 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
             )}
           >
             {confident ? <Sparkles aria-hidden className="size-3" /> : <TriangleAlert aria-hidden className="size-3" />}
-            {confident ? "AI gợi ý" : "Cần bạn kiểm tra"} · <span className="num">{formatPercent(preview.confidence * 100)}</span>
+            {confident ? msg().aiSuggests : msg().needsCheck} · <span className="num">{formatPercent(preview.confidence * 100)}</span>
           </span>
         </div>
         <Select value={preview.categoryId ?? undefined} onValueChange={(v) => onChange({ ...preview, categoryId: v, confidence: 1 })}>
           <SelectTrigger id={`${ids}-cat`} className="w-full">
-            <SelectValue placeholder="Chọn danh mục" />
+            <SelectValue placeholder={msg().pickCategory} />
           </SelectTrigger>
           <SelectContent>
             {typeCategories.map((c) => (
@@ -145,7 +151,7 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor={`${ids}-date`} className="mb-1.5 block text-[13px] font-medium">
-            Ngày
+            {msg().date}
           </label>
           <Select value={preview.date} onValueChange={(v) => set("date", v)}>
             <SelectTrigger id={`${ids}-date`} className="num w-full">
@@ -155,8 +161,8 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
               {dateOptions.map((d, i) => (
                 <SelectItem key={d} value={d}>
                   <span className="num">{formatDate(d)}</span>
-                  {i === 0 && d === today && <span className="text-muted-foreground"> · Hôm nay</span>}
-                  {i === 1 && <span className="text-muted-foreground"> · Hôm qua</span>}
+                  {i === 0 && d === today && <span className="text-muted-foreground"> · {msg().today}</span>}
+                  {i === 1 && <span className="text-muted-foreground"> · {msg().yesterday}</span>}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -164,7 +170,7 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
         </div>
         <div>
           <label htmlFor={`${ids}-wallet`} className="mb-1.5 block text-[13px] font-medium">
-            Ví
+            {msg().wallet}
           </label>
           <Select value={preview.walletId} onValueChange={(v) => set("walletId", v)}>
             <SelectTrigger id={`${ids}-wallet`} className="w-full">
@@ -183,7 +189,7 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
 
       <div>
         <label htmlFor={`${ids}-desc`} className="mb-1.5 block text-[13px] font-medium">
-          Mô tả
+          {msg().description}
         </label>
         <Input id={`${ids}-desc`} value={preview.description} onChange={(e) => set("description", e.target.value)} />
       </div>
@@ -197,19 +203,19 @@ export function QuickEntryPreviewForm({ preview, onChange, onSave, onCancel, sav
 
       <div className="flex items-center justify-between gap-3 border-t pt-4">
         <p className="hidden text-xs text-muted-foreground md:block">
-          <kbd className="num rounded border px-1">Enter</kbd> lưu · <kbd className="num rounded border px-1">Esc</kbd> huỷ
+          <kbd className="num rounded border px-1">Enter</kbd> {msg().keySave} · <kbd className="num rounded border px-1">Esc</kbd> {msg().keyCancel}
         </p>
         <div className="ml-auto flex gap-2">
           <Button type="button" variant="ghost" onClick={onCancel} disabled={saving} className="max-md:h-11">
-            Huỷ
+            {getMessages(commonMessages).cancel}
           </Button>
           <Button type="submit" disabled={saving} aria-busy={saving} className="min-w-24 max-md:h-11">
             {saving ? (
               <>
-                <Loader2 aria-hidden className="animate-spin" /> Đang lưu…
+                <Loader2 aria-hidden className="animate-spin" /> {getMessages(commonMessages).saving}
               </>
             ) : (
-              "Lưu"
+              getMessages(commonMessages).save
             )}
           </Button>
         </div>

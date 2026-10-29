@@ -30,9 +30,16 @@ import { formatDate, formatMoney, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { XP_LIMIT_NOTE, xpSuffix } from "@/lib/xp";
 import { RuleSuggestionPrompt } from "./rule-suggestion";
+import { getActiveLocale, INTL_LOCALE } from "@/i18n/core";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { transactionsMessages } from "@/i18n/messages/transactions";
+import { te } from "@/i18n/errors";
 
-const vnd = new Intl.NumberFormat("vi-VN");
-const SOURCE_LABEL = { form: "Nhập bằng form", nlp: "Câu tự nhiên (AI)", csv: "Sao kê CSV" } as const;
+const msg = () => getMessages(transactionsMessages);
+
+/** Dấu phân cách nghìn theo ngôn ngữ giao diện */
+const vnd = { format: (n: number) => new Intl.NumberFormat(INTL_LOCALE[getActiveLocale()]).format(n) };
 
 type Draft = Required<TransactionPatch>;
 
@@ -99,8 +106,8 @@ function TransactionEditor({
   };
 
   const validate = () => {
-    if (!draft.amount || draft.amount <= 0) return "Nhập số tiền lớn hơn 0đ.";
-    if (!draft.description.trim()) return "Mô tả không được để trống.";
+    if (!draft.amount || draft.amount <= 0) return msg().sheet.amountRequired(formatMoney(0));
+    if (!draft.description.trim()) return msg().sheet.descriptionRequired;
     return null;
   };
 
@@ -111,10 +118,10 @@ function TransactionEditor({
     setSaving("save");
     try {
       const result = await transactionService.updateTransaction(tx.id, patch);
-      toast.success("Đã lưu thay đổi");
+      toast.success(msg().sheet.saved);
       setSuggestion(result.ruleSuggestion);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Lưu chưa thành công, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().sheet.saveFailed);
     } finally {
       setSaving(null);
     }
@@ -130,16 +137,16 @@ function TransactionEditor({
       const { categoryId, ...rest } = patch;
       if (Object.keys(rest).length) await transactionService.updateTransaction(tx.id, rest);
       const result = await transactionService.reviewTransaction(tx.id, categoryId);
-      toast.success(`Đã duyệt${xpSuffix(result)}`, {
+      toast.success(`${msg().sheet.reviewed}${xpSuffix(result)}`, {
         description: result.xpLimitReached
           ? XP_LIMIT_NOTE.review
           : result.remainingPending
-            ? `Còn ${result.remainingPending} giao dịch chờ duyệt.`
-            : "Bạn đã duyệt hết giao dịch chờ!",
+            ? msg().sheet.remaining(result.remainingPending)
+            : msg().sheet.allReviewed,
       });
       setSuggestion(result.ruleSuggestion);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Duyệt chưa thành công, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().sheet.reviewFailed);
     } finally {
       setSaving(null);
     }
@@ -149,13 +156,13 @@ function TransactionEditor({
     setSaving("delete");
     try {
       const { xpRemoved } = await transactionService.deleteTransactions([tx.id]);
-      toast.success("Đã xoá giao dịch", {
-        description: `${tx.description} · ${formatMoney(tx.amount)}${xpRemoved ? ` · trừ lại ${xpRemoved} XP đã cộng hôm nay` : ""}`,
+      toast.success(msg().sheet.deleted, {
+        description: `${tx.description} · ${formatMoney(tx.amount)}${xpRemoved ? msg().sheet.xpRemoved(xpRemoved) : ""}`,
       });
       setConfirmDelete(false);
       onDeleted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Xoá chưa thành công, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().sheet.deleteFailed);
       setSaving(null);
     }
   };
@@ -180,8 +187,9 @@ function TransactionEditor({
           <div className="mb-4 flex items-start gap-3 rounded-xl bg-accent p-3.5 text-sm">
             <Sparkles aria-hidden className="mt-0.5 size-4 shrink-0 text-info" />
             <p>
-              AI đoán danh mục <strong className="font-semibold">{tx.category.name}</strong> nhưng chưa chắc chắn (
-              <span className="num">{formatPercent((tx.aiConfidence ?? 0) * 100)}</span>). Kiểm tra lại rồi bấm <strong>Duyệt</strong>.
+              {msg().sheet.aiNoteBefore} <strong className="font-semibold">{tx.category.name}</strong> {msg().sheet.aiNoteMiddle}
+              <span className="num">{formatPercent((tx.aiConfidence ?? 0) * 100)}</span>
+              {msg().sheet.aiNoteAfter} <strong>{msg().sheet.approve}</strong>.
             </p>
           </div>
         )}
@@ -205,7 +213,7 @@ function TransactionEditor({
         >
           <div className="flex items-end gap-3">
             <div className="min-w-0 flex-1">
-              <Field label="Số tiền" htmlFor={`${ids}-amount`}>
+              <Field label={msg().sheet.amount} htmlFor={`${ids}-amount`}>
                 <div className="relative">
                   <Input
                     id={`${ids}-amount`}
@@ -223,12 +231,12 @@ function TransactionEditor({
                     )}
                   />
                   <span aria-hidden className="num pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground">
-                    đ
+                    {getMessages(commonMessages).currencySuffix}
                   </span>
                 </div>
               </Field>
             </div>
-            <div role="radiogroup" aria-label="Loại giao dịch" className="flex shrink-0 rounded-lg border p-0.5">
+            <div role="radiogroup" aria-label={msg().sheet.type} className="flex shrink-0 rounded-lg border p-0.5">
               {(["expense", "income"] as const).map((t) => {
                 const active = draft.type === t;
                 const Icon = t === "income" ? ArrowDownLeft : ArrowUpRight;
@@ -249,14 +257,14 @@ function TransactionEditor({
                     )}
                   >
                     <Icon aria-hidden className="size-4" />
-                    {t === "income" ? "Thu" : "Chi"}
+                    {t === "income" ? getMessages(commonMessages).income : getMessages(commonMessages).expense}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          <Field label="Danh mục" htmlFor={`${ids}-cat`}>
+          <Field label={msg().sheet.category} htmlFor={`${ids}-cat`}>
             <Select value={draft.categoryId} onValueChange={(v) => set("categoryId", v)}>
               <SelectTrigger id={`${ids}-cat`} className="w-full">
                 <SelectValue />
@@ -272,10 +280,10 @@ function TransactionEditor({
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Ngày" htmlFor={`${ids}-date`}>
+            <Field label={msg().sheet.date} htmlFor={`${ids}-date`}>
               <DatePicker id={`${ids}-date`} value={draft.date} onChange={(v) => set("date", v)} max={today} />
             </Field>
-            <Field label="Ví" htmlFor={`${ids}-wallet`}>
+            <Field label={msg().sheet.wallet} htmlFor={`${ids}-wallet`}>
               <Select value={draft.walletId} onValueChange={(v) => set("walletId", v)}>
                 <SelectTrigger id={`${ids}-wallet`} className="w-full">
                   <SelectValue />
@@ -291,7 +299,7 @@ function TransactionEditor({
             </Field>
           </div>
 
-          <Field label="Mô tả" htmlFor={`${ids}-desc`}>
+          <Field label={msg().sheet.description} htmlFor={`${ids}-desc`}>
             <Input
               id={`${ids}-desc`}
               value={draft.description}
@@ -309,16 +317,16 @@ function TransactionEditor({
         </form>
 
         <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 border-t pt-4 text-[13px]">
-          <dt className="text-muted-foreground">Nguồn</dt>
-          <dd>{SOURCE_LABEL[tx.source]}</dd>
+          <dt className="text-muted-foreground">{msg().sheet.source}</dt>
+          <dd>{msg().sheet.sources[tx.source]}</dd>
           {tx.aiConfidence != null && (
             <>
-              <dt className="text-muted-foreground">Độ tin cậy AI</dt>
+              <dt className="text-muted-foreground">{msg().sheet.confidence}</dt>
               <dd className="num">{formatPercent(tx.aiConfidence * 100)}</dd>
             </>
           )}
-          <dt className="text-muted-foreground">Trạng thái</dt>
-          <dd>{pending ? "Chờ duyệt" : "Đã xác nhận"}</dd>
+          <dt className="text-muted-foreground">{msg().sheet.status}</dt>
+          <dd>{pending ? msg().sheet.pending : msg().sheet.confirmed}</dd>
         </dl>
       </div>
 
@@ -330,18 +338,18 @@ function TransactionEditor({
           disabled={!!saving}
           className="text-danger hover:bg-expense-soft hover:text-danger max-md:h-11"
         >
-          <Trash2 aria-hidden /> Xoá
+          <Trash2 aria-hidden /> {msg().sheet.delete}
         </Button>
         <div className="ml-auto flex gap-2">
           {dirty && (
             <Button type="button" variant="ghost" onClick={() => setDraft(toDraft(tx))} disabled={!!saving} className="max-md:h-11">
-              Hoàn tác
+              {msg().sheet.undo}
             </Button>
           )}
           {pending ? (
             <Button type="button" onClick={review} disabled={!!saving} aria-busy={saving === "review"} className="max-md:h-11">
               {saving === "review" ? <Loader2 aria-hidden className="animate-spin" /> : <Check aria-hidden />}
-              Duyệt
+              {msg().sheet.approve}
             </Button>
           ) : (
             <Button
@@ -352,7 +360,7 @@ function TransactionEditor({
               className="max-md:h-11"
             >
               {saving === "save" && <Loader2 aria-hidden className="animate-spin" />}
-              Lưu thay đổi
+              {msg().sheet.saveChanges}
             </Button>
           )}
         </div>
@@ -361,15 +369,13 @@ function TransactionEditor({
       <AlertDialog open={confirmDelete} onOpenChange={(o) => saving !== "delete" && setConfirmDelete(o)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xoá giao dịch này?</AlertDialogTitle>
+            <AlertDialogTitle>{msg().sheet.confirmTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              “{tx.description}” <span className="num">{formatMoney(tx.amount)}</span> ngày{" "}
-              <span className="num">{formatDate(tx.date)}</span> sẽ bị xoá và số dư ví {tx.wallet.name} được tính lại. Không
-              hoàn tác được.
+              {msg().sheet.confirmText(tx.description, formatMoney(tx.amount), formatDate(tx.date), tx.wallet.name)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving === "delete"}>Giữ lại</AlertDialogCancel>
+            <AlertDialogCancel disabled={saving === "delete"}>{msg().keep}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={(e) => {
@@ -379,7 +385,7 @@ function TransactionEditor({
               disabled={saving === "delete"}
             >
               {saving === "delete" && <Loader2 aria-hidden className="animate-spin" />}
-              Xoá giao dịch
+              {msg().sheet.confirmDelete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -430,23 +436,23 @@ export function TransactionSheet({
         ) : query.error ? (
           <>
             <SheetHeader className="sr-only">
-              <SheetTitle>Không tải được giao dịch</SheetTitle>
-              <SheetDescription>Đã có lỗi khi tải chi tiết giao dịch</SheetDescription>
+              <SheetTitle>{msg().sheet.loadFailed}</SheetTitle>
+              <SheetDescription>{msg().sheet.loadFailedText}</SheetDescription>
             </SheetHeader>
-            <ErrorState title="Không tải được giao dịch" error={query.error} onRetry={query.refetch} />
+            <ErrorState title={msg().sheet.loadFailed} error={query.error} onRetry={query.refetch} />
           </>
         ) : query.data === null && !query.fetching ? (
           <>
             <SheetHeader className="px-5 pt-5">
-              <SheetTitle>Không tìm thấy giao dịch</SheetTitle>
-              <SheetDescription>Giao dịch này có thể đã bị xoá.</SheetDescription>
+              <SheetTitle>{msg().sheet.notFound}</SheetTitle>
+              <SheetDescription>{msg().sheet.notFoundText}</SheetDescription>
             </SheetHeader>
           </>
         ) : (
           <div aria-hidden className="flex flex-col gap-4 p-5">
             <SheetHeader className="sr-only">
-              <SheetTitle>Đang tải giao dịch</SheetTitle>
-              <SheetDescription>Vui lòng chờ</SheetDescription>
+              <SheetTitle>{msg().sheet.loading}</SheetTitle>
+              <SheetDescription>{msg().sheet.wait}</SheetDescription>
             </SheetHeader>
             <Skeleton className="h-6 w-3/4" />
             <Skeleton className="h-4 w-1/2" />

@@ -27,16 +27,17 @@ import { formatDate } from "@/lib/format";
 import { normalize } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { AdminHeader } from "./admin-shell";
+import { getActiveLocale, getMessages, INTL_LOCALE } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { adminMessages } from "@/i18n/messages/admin";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(adminMessages);
 
 type Filter = "all" | "active" | "inactive" | "locked";
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: "all", label: "Tất cả" },
-  { value: "active", label: "Hoạt động 7 ngày" },
-  { value: "inactive", label: "Lâu không vào" },
-  { value: "locked", label: "Bị khoá" },
-];
+const FILTER_VALUES: Filter[] = ["all", "active", "inactive", "locked"];
 
-const nf = new Intl.NumberFormat("vi-VN");
+const nf = { format: (v: number) => new Intl.NumberFormat(INTL_LOCALE[getActiveLocale()]).format(v) };
 
 function daysBetween(a: string, b: string) {
   return Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -68,12 +69,12 @@ export function UsersPage() {
     setSaving(true);
     try {
       await adminService.setUserLocked(target.id, !target.isLocked);
-      toast.success(target.isLocked ? `Đã mở khoá ${target.fullName}` : `Đã khoá ${target.fullName}`, {
-        description: target.isLocked ? "Người dùng đăng nhập lại được ngay." : "Người dùng không đăng nhập được cho tới khi được mở khoá. Dữ liệu vẫn giữ nguyên.",
+      toast.success(target.isLocked ? msg().users.unlocked(target.fullName) : msg().users.lockedDone(target.fullName), {
+        description: target.isLocked ? msg().users.unlockedHint : msg().users.lockedHint,
       });
       setTarget(null);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không cập nhật được");
+      toast.error(e instanceof Error ? te(e.message) : msg().updateFailed);
     } finally {
       setSaving(false);
     }
@@ -82,8 +83,8 @@ export function UsersPage() {
   return (
     <>
       <AdminHeader
-        title="Người dùng"
-        description={users.data ? `${nf.format(users.data.length)} tài khoản · khoá tài khoản không xoá dữ liệu` : "Xem và khoá / mở khoá tài khoản"}
+        title={msg().users.title}
+        description={users.data ? msg().users.count(nf.format(users.data.length)) : msg().users.intro}
       />
 
       <Panel className="p-0 md:p-0">
@@ -94,13 +95,13 @@ export function UsersPage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm theo tên hoặc email"
-              aria-label="Tìm người dùng theo tên hoặc email"
+              placeholder={msg().users.search}
+              aria-label={msg().users.searchLabel}
               className="h-8 pl-8 text-[13px] max-md:h-10"
             />
           </div>
-          <div role="group" aria-label="Lọc người dùng" className="inline-flex flex-wrap rounded-lg bg-muted p-0.5">
-            {FILTERS.map((f) => (
+          <div role="group" aria-label={msg().users.filterLabel} className="inline-flex flex-wrap rounded-lg bg-muted p-0.5">
+            {FILTER_VALUES.map((value) => ({ value, label: msg().users.filters[value] })).map((f) => (
               <button
                 key={f.value}
                 type="button"
@@ -121,20 +122,20 @@ export function UsersPage() {
         {users.error ? (
           <ErrorState error={users.error} onRetry={users.refetch} />
         ) : (
-          <Table aria-label="Danh sách người dùng" aria-busy={users.loading}>
+          <Table aria-label={msg().users.tableLabel} aria-busy={users.loading}>
             <TableHeader className="bg-surface-subtle">
               <TableRow className="hover:bg-transparent">
-                <TableHead>Họ tên</TableHead>
+                <TableHead>{msg().users.name}</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Vai trò</TableHead>
-                <TableHead>Tham gia</TableHead>
-                <TableHead>Hoạt động gần nhất</TableHead>
-                <TableHead className="text-right">Giao dịch</TableHead>
-                <TableHead className="text-right">Chuỗi</TableHead>
-                <TableHead className="text-right">Lượt AI</TableHead>
-                <TableHead>Trạng thái</TableHead>
+                <TableHead>{msg().users.role}</TableHead>
+                <TableHead>{msg().users.joined}</TableHead>
+                <TableHead>{msg().users.lastActive}</TableHead>
+                <TableHead className="text-right">{msg().users.transactions}</TableHead>
+                <TableHead className="text-right">{msg().users.streak}</TableHead>
+                <TableHead className="text-right">{msg().users.aiCalls}</TableHead>
+                <TableHead>{msg().users.status}</TableHead>
                 <TableHead className="w-28 text-right">
-                  <span className="sr-only">Thao tác</span>
+                  <span className="sr-only">{getMessages(commonMessages).actions}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -156,27 +157,27 @@ export function UsersPage() {
                       <TableRow key={u.id} className={cn(u.isLocked && "bg-muted/60")}>
                         <TableCell className="max-w-[200px] truncate font-medium" title={u.fullName}>
                           {u.fullName}
-                          {self && <span className="font-normal text-muted-foreground"> (bạn)</span>}
+                          {self && <span className="font-normal text-muted-foreground">{msg().users.you}</span>}
                         </TableCell>
                         <TableCell className="max-w-[240px] truncate text-muted-foreground" title={u.email}>
                           {u.email}
                         </TableCell>
-                        <TableCell>{u.role === "admin" ? "Quản trị" : "Người dùng"}</TableCell>
+                        <TableCell>{u.role === "admin" ? msg().users.admin : msg().users.user}</TableCell>
                         <TableCell className="num">{formatDate(u.createdAt.slice(0, 10))}</TableCell>
                         <TableCell className="num">
-                          {days === null ? "—" : days === 0 ? "Hôm nay" : days === 1 ? "Hôm qua" : `${days} ngày trước`}
+                          {days === null ? "—" : days === 0 ? msg().users.today : days === 1 ? msg().users.yesterday : msg().users.daysAgo(days)}
                         </TableCell>
                         <TableCell className="num text-right">{nf.format(u.transactionCount)}</TableCell>
-                        <TableCell className="num text-right">{u.currentStreak ? `${u.currentStreak} ngày` : "—"}</TableCell>
+                        <TableCell className="num text-right">{u.currentStreak ? msg().users.days(u.currentStreak) : "—"}</TableCell>
                         <TableCell className="num text-right">{nf.format(u.aiCalls)}</TableCell>
                         <TableCell>
                           {u.isLocked ? (
                             <span className="inline-flex items-center gap-1 rounded-md bg-expense-soft px-1.5 py-0.5 text-xs font-medium text-danger">
-                              <Lock aria-hidden className="size-3" /> Bị khoá
+                              <Lock aria-hidden className="size-3" /> {msg().users.isLocked}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                              <span aria-hidden className="size-1.5 rounded-full bg-success" /> Hoạt động
+                              <span aria-hidden className="size-1.5 rounded-full bg-success" /> {msg().users.isActive}
                             </span>
                           )}
                         </TableCell>
@@ -186,11 +187,11 @@ export function UsersPage() {
                               size="xs"
                               variant={u.isLocked ? "outline" : "ghost"}
                               onClick={() => setTarget(u)}
-                              aria-label={`${u.isLocked ? "Mở khoá" : "Khoá"} tài khoản ${u.fullName}`}
+                              aria-label={msg().users.toggleLabel(u.isLocked, u.fullName)}
                               className={cn(!u.isLocked && "text-danger hover:bg-expense-soft hover:text-danger", "max-md:h-9")}
                             >
                               {u.isLocked ? <LockOpen aria-hidden /> : <Lock aria-hidden />}
-                              {u.isLocked ? "Mở khoá" : "Khoá"}
+                              {u.isLocked ? msg().users.unlock : msg().users.lock}
                             </Button>
                           )}
                         </TableCell>
@@ -201,7 +202,7 @@ export function UsersPage() {
           </Table>
         )}
         {!users.loading && !users.error && rows.length === 0 && (
-          <EmptyState icon={Users} className="py-10" title="Không có người dùng phù hợp" description="Thử từ khoá khác hoặc bỏ bộ lọc." />
+          <EmptyState icon={Users} className="py-10" title={msg().users.emptyTitle} description={msg().users.emptyText} />
         )}
       </Panel>
 
@@ -209,23 +210,23 @@ export function UsersPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {target?.isLocked ? "Mở khoá" : "Khoá"} tài khoản {target?.fullName}?
+              {msg().users.confirmTitle(!!target?.isLocked, target?.fullName ?? "")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {target?.isLocked
-                ? `${target?.email} sẽ đăng nhập lại được ngay.`
-                : `${target?.email} sẽ không đăng nhập được cho tới khi được mở khoá. Dữ liệu của họ vẫn giữ nguyên, không bị xoá.`}
+                ? msg().users.confirmUnlock(target?.email ?? "")
+                : msg().users.confirmLock(target?.email ?? "")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Huỷ</AlertDialogCancel>
+            <AlertDialogCancel disabled={saving}>{getMessages(commonMessages).cancel}</AlertDialogCancel>
             <Button
               disabled={saving}
               onClick={() => void confirm()}
               className={cn(!target?.isLocked && "bg-danger text-white hover:bg-danger/90")}
             >
               {saving && <Loader2 aria-hidden className="motion-safe:animate-spin" />}
-              {target?.isLocked ? "Mở khoá" : "Khoá tài khoản"}
+              {target?.isLocked ? msg().users.unlock : msg().users.lockAccount}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

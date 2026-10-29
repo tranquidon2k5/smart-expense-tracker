@@ -25,6 +25,11 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { categoryService } from "@/services";
 import { formatMoney } from "@/lib/format";
 import { CategoryFormDialog } from "./category-form-dialog";
+import { getMessages } from "@/i18n/core";
+import { categoriesMessages } from "@/i18n/messages/categories";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(categoriesMessages);
 
 function CategoryList({
   type,
@@ -45,19 +50,19 @@ function CategoryList({
     <Panel
       title={
         <>
-          {type === "income" ? "Khoản thu" : "Khoản chi"}{" "}
+          {msg().group(type === "income")}{" "}
           <span className="num text-sm font-normal text-muted-foreground">({items.length})</span>
         </>
       }
       icon={<Icon aria-hidden className={type === "income" ? "size-5 text-income" : "size-5 text-expense"} />}
       action={
         <Button variant="outline" size="sm" onClick={onAdd} className="max-md:h-11">
-          <Plus aria-hidden /> Thêm danh mục {type === "income" ? "thu" : "chi"}
+          <Plus aria-hidden /> {msg().addOfType(type === "income")}
         </Button>
       }
       className="p-0 md:p-0 [&>header]:px-4 [&>header]:pt-4 md:[&>header]:px-5 md:[&>header]:pt-5"
     >
-      <ul className="border-t" aria-label={type === "income" ? "Danh mục thu" : "Danh mục chi"}>
+      <ul className="border-t" aria-label={msg().listLabel(type === "income")}>
         {items.map((u) => (
           <li
             key={u.category.id}
@@ -70,21 +75,21 @@ function CategoryList({
                 {u.isDefault && (
                   <span
                     className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
-                    title="Danh mục mặc định của hệ thống, không sửa hoặc xoá được"
+                    title={msg().defaultTitle}
                   >
-                    <Lock aria-hidden className="size-3" /> Mặc định
+                    <Lock aria-hidden className="size-3" /> {msg().default}
                   </span>
                 )}
               </p>
               <p className="text-[13px] text-muted-foreground">
-                <span className="num">{u.transactionCount}</span> giao dịch
+                <span className="num">{u.transactionCount}</span> {msg().transactions}
                 {u.monthAmount > 0 && (
                   <>
                     {" "}
-                    · tháng này <span className="num">{formatMoney(u.monthAmount)}</span>
+                    · {msg().thisMonth} <span className="num">{formatMoney(u.monthAmount)}</span>
                   </>
                 )}
-                {u.hasBudget && " · có ngân sách"}
+                {u.hasBudget && msg().hasBudget}
               </p>
             </div>
             {!u.isDefault && (
@@ -93,8 +98,8 @@ function CategoryList({
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => onEdit(u.category)}
-                  aria-label={`Sửa danh mục ${u.category.name}`}
-                  title="Sửa"
+                  aria-label={msg().editFor(u.category.name)}
+                  title={msg().edit}
                   className="text-muted-foreground max-md:size-11"
                 >
                   <PencilLine aria-hidden />
@@ -103,8 +108,8 @@ function CategoryList({
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => onDelete(u)}
-                  aria-label={`Xoá danh mục ${u.category.name}`}
-                  title="Xoá"
+                  aria-label={msg().deleteFor(u.category.name)}
+                  title={msg().delete}
                   className="text-muted-foreground hover:bg-expense-soft hover:text-danger max-md:size-11"
                 >
                   <Trash2 aria-hidden />
@@ -118,9 +123,9 @@ function CategoryList({
         <div className="flex items-center gap-3 border-t bg-surface-subtle px-4 py-3 text-[13px] text-muted-foreground md:px-5">
           <Shapes aria-hidden className="size-4 shrink-0" />
           <span>
-            Bạn chưa có danh mục {type === "income" ? "thu" : "chi"} riêng.{" "}
+            {msg().noOwn(type === "income")}{" "}
             <button type="button" onClick={onAdd} className="font-medium text-primary underline-offset-4 hover:underline">
-              Tạo danh mục đầu tiên
+              {msg().createFirst}
             </button>
           </span>
         </div>
@@ -155,17 +160,17 @@ function DeleteCategoryDialog({
 
   const confirm = async () => {
     if (!target) return;
-    if (used && !moveTo) return setError("Chọn danh mục để chuyển giao dịch sang.");
+    if (used && !moveTo) return setError(msg().del.pickTarget);
     setDeleting(true);
     try {
       const { moved } = await categoryService.deleteCategory(target.category.id, used ? moveTo : undefined);
       const dest = all.find((u) => u.category.id === moveTo)?.category.name;
-      toast.success(`Đã xoá danh mục “${target.category.name}”`, {
-        description: moved ? `${moved} giao dịch đã chuyển sang ${dest}.` : undefined,
+      toast.success(msg().del.done(target.category.name), {
+        description: moved ? msg().del.moved(moved, dest ?? "") : undefined,
       });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chưa xoá được, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().del.failed);
     } finally {
       setDeleting(false);
     }
@@ -175,26 +180,27 @@ function DeleteCategoryDialog({
     <AlertDialog open={!!target} onOpenChange={(o) => !o && !deleting && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Xoá danh mục “{target?.category.name}”?</AlertDialogTitle>
+          <AlertDialogTitle>{msg().del.title(target?.category.name ?? "")}</AlertDialogTitle>
           <AlertDialogDescription>
             {used ? (
               <>
-                Danh mục đang có <span className="num">{target?.transactionCount}</span> giao dịch
-                {target?.hasBudget ? " và một hạn mức ngân sách" : ""}. Chọn danh mục để chuyển chúng sang trước khi xoá.
+                {msg().del.usedBefore} <span className="num">{target?.transactionCount}</span> {msg().del.usedTx}
+                {target?.hasBudget ? msg().del.usedBudget : ""}
+                {msg().del.usedAfter}
               </>
             ) : (
-              "Danh mục chưa có giao dịch nào. Xoá xong không hoàn tác được."
+              msg().del.unused
             )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {used && (
           <div>
             <label htmlFor="move-to" className="mb-1.5 block text-[13px] font-medium">
-              Chuyển giao dịch sang
+              {msg().del.moveTo}
             </label>
             <Select value={moveTo} onValueChange={setMoveTo}>
               <SelectTrigger id="move-to" className="w-full">
-                <SelectValue placeholder="Chọn danh mục" />
+                <SelectValue placeholder={msg().del.pick} />
               </SelectTrigger>
               <SelectContent>
                 {options.map((o) => (
@@ -212,7 +218,7 @@ function DeleteCategoryDialog({
           </p>
         )}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleting}>Giữ lại</AlertDialogCancel>
+          <AlertDialogCancel disabled={deleting}>{msg().del.keep}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={deleting}
@@ -222,7 +228,7 @@ function DeleteCategoryDialog({
             }}
           >
             {deleting && <Loader2 aria-hidden className="animate-spin" />}
-            {used ? "Chuyển và xoá" : "Xoá danh mục"}
+            {used ? msg().del.moveAndDelete : msg().del.deleteCategory}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -247,18 +253,18 @@ export function CategoriesPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Danh mục"
-        description="Danh mục mặc định dùng chung cho mọi người. Thêm danh mục riêng để phân loại theo cách của bạn."
+        title={msg().title}
+        description={msg().intro}
         actions={
           <Button onClick={() => openCreate("expense")} className="max-md:h-11">
-            <Plus aria-hidden /> Thêm danh mục
+            <Plus aria-hidden /> {msg().add}
           </Button>
         }
       />
 
       {query.error && !query.data ? (
         <section className="rounded-xl border bg-card">
-          <ErrorState title="Không tải được danh mục" error={query.error} onRetry={query.refetch} className="min-h-[360px]" />
+          <ErrorState title={msg().loadFailed} error={query.error} onRetry={query.refetch} className="min-h-[360px]" />
         </section>
       ) : query.loading ? (
         <div aria-hidden className="grid gap-4 md:gap-5 xl:grid-cols-2 xl:gap-6">

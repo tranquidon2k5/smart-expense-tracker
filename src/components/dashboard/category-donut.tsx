@@ -12,6 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/empty-state";
 import { Panel } from "@/components/panel";
 import { formatCompactMoney, formatMoney, formatMonthLong, formatPercent } from "@/lib/format";
+import { getMessages } from "@/i18n/core";
+import { dashboardMessages } from "@/i18n/messages/dashboard";
+
+const t = () => getMessages(dashboardMessages);
 
 function sliceHref(s: CategorySlice) {
   return s.categoryId ? `/giao-dich?danh-muc=${s.categoryId}` : "/giao-dich";
@@ -54,11 +58,11 @@ export function CategoryDonut({
 
   return (
     <Panel
-      title="Chi theo danh mục"
+      title={t().donut.title}
       description={
         top && data
-          ? `${top.name} chiếm nhiều nhất: ${formatPercent(top.percent)} tổng chi ${periodLabel ?? formatMonthLong(data.month).toLowerCase()}`
-          : `Tỷ lệ chi tiêu của từng danh mục ${periodLabel ?? "trong tháng"}`
+          ? t().donut.topShare(top.name, formatPercent(top.percent), periodLabel ?? t().donut.ofMonth(formatMonthLong(data.month)))
+          : t().donut.shareOf(periodLabel ?? t().donut.inMonth)
       }
       className={className}
       action={
@@ -68,8 +72,8 @@ export function CategoryDonut({
             size="icon-sm"
             onClick={() => setAsTable((v) => !v)}
             aria-pressed={asTable}
-            aria-label={asTable ? "Xem biểu đồ" : "Xem dạng bảng"}
-            title={asTable ? "Xem biểu đồ" : "Xem dạng bảng"}
+            aria-label={asTable ? t().donut.showChart : t().donut.showTable}
+            title={asTable ? t().donut.showChart : t().donut.showTable}
             className="text-muted-foreground max-md:size-11"
           >
             {asTable ? <ChartPie aria-hidden /> : <Table2 aria-hidden />}
@@ -90,17 +94,17 @@ export function CategoryDonut({
         <EmptyState
           icon={ChartPie}
           className="min-h-[320px]"
-          title={periodLabel ? "Chưa có khoản chi nào trong khoảng này" : "Chưa có khoản chi nào tháng này"}
-          description="Ghi khoản chi đầu tiên để xem tiền của bạn đi đâu."
-          action={onAddFirst && <Button onClick={onAddFirst}>Ghi khoản chi</Button>}
+          title={periodLabel ? t().donut.emptyRange : t().donut.emptyMonth}
+          description={t().donut.emptyText}
+          action={onAddFirst && <Button onClick={onAddFirst}>{t().donut.addExpense}</Button>}
         />
       ) : asTable ? (
-        <Table aria-label="Chi theo danh mục">
+        <Table aria-label={t().donut.title}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="px-2">Danh mục</TableHead>
-              <TableHead className="px-2 text-right">Số tiền</TableHead>
-              <TableHead className="px-2 text-right">Tỷ lệ</TableHead>
+              <TableHead className="px-2">{t().donut.category}</TableHead>
+              <TableHead className="px-2 text-right">{t().donut.amount}</TableHead>
+              <TableHead className="px-2 text-right">{t().donut.share}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -164,7 +168,7 @@ export function CategoryDonut({
                     return (
                       <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
                         <tspan x={cx} dy="-0.6em" fontSize={12} fill="var(--muted-foreground)">
-                          Tổng chi
+                          {t().donut.total}
                         </tspan>
                         <tspan x={cx} dy="1.5em" fontSize={17} fontWeight={600} fill="var(--foreground)" fontFamily="var(--font-num)">
                           {formatCompactMoney(data!.total)}
@@ -177,7 +181,7 @@ export function CategoryDonut({
             </PieChart>
           </ChartContainer>
 
-          <ul className="flex flex-col md:max-w-md md:flex-1 xl:max-w-none" aria-label="Chú thích danh mục">
+          <ul className="flex flex-col md:max-w-md md:flex-1 xl:max-w-none" aria-label={t().donut.legend}>
             {slices.map((s) => (
               <li key={s.name}>
                 <Link

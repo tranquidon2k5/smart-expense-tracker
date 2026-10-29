@@ -37,6 +37,12 @@ import { PendingReview } from "./pending-review";
 import { TransactionSheet } from "./transaction-sheet";
 import { TransactionsTable } from "./transactions-table";
 import { activeFilterCount, useTransactionFilters } from "./use-transaction-filters";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { transactionsMessages } from "@/i18n/messages/transactions";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(transactionsMessages);
 
 type TabKey = "tat-ca" | "cho-duyet";
 const EMPTY_CATEGORIES: Category[] = [];
@@ -82,12 +88,12 @@ function BulkBar({
     setBusy(true);
     try {
       const { updated, skipped } = await transactionService.bulkUpdateTransactions(ids, patch);
-      toast.success(`Đã ${label} cho ${updated} giao dịch`, {
-        description: skipped ? `Bỏ qua ${skipped} giao dịch khác loại thu/chi với danh mục đã chọn.` : undefined,
+      toast.success(msg().bulk.done(label, updated), {
+        description: skipped ? msg().bulk.skipped(skipped) : undefined,
       });
       clear();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Chưa cập nhật được, bạn thử lại nhé.");
+      toast.error(e instanceof Error ? te(e.message) : msg().bulk.failed);
     } finally {
       setBusy(false);
     }
@@ -96,27 +102,27 @@ function BulkBar({
   return (
     <div
       role="region"
-      aria-label="Thao tác hàng loạt"
+      aria-label={msg().bulk.region}
       className="flex flex-wrap items-center gap-2 border-b bg-accent px-4 py-2 md:px-5"
     >
       <p className="mr-2 text-sm font-medium text-accent-foreground" aria-live="polite">
-        Đã chọn <span className="num">{ids.length}</span> giao dịch
+        {msg().bulk.selected} <span className="num">{ids.length}</span> {msg().bulk.transactions}
       </p>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" disabled={busy} className="bg-card">
-            <Shapes aria-hidden /> Đổi danh mục <ChevronDown aria-hidden />
+            <Shapes aria-hidden /> {msg().bulk.changeCategory} <ChevronDown aria-hidden />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="max-h-[min(420px,70svh)] w-56 overflow-y-auto">
           {(["expense", "income"] as const).map((t, i) => (
             <React.Fragment key={t}>
               {i > 0 && <DropdownMenuSeparator />}
-              <DropdownMenuLabel>{t === "expense" ? "Khoản chi" : "Khoản thu"}</DropdownMenuLabel>
+              <DropdownMenuLabel>{t === "expense" ? msg().expenseGroup : msg().incomeGroup}</DropdownMenuLabel>
               {categories
                 .filter((c) => c.type === t)
                 .map((c) => (
-                  <DropdownMenuItem key={c.id} onSelect={() => apply({ categoryId: c.id }, `đổi sang “${c.name}”`)}>
+                  <DropdownMenuItem key={c.id} onSelect={() => apply({ categoryId: c.id }, msg().bulk.movedTo(c.name))}>
                     <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: c.color }} />
                     {c.name}
                   </DropdownMenuItem>
@@ -128,12 +134,12 @@ function BulkBar({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" disabled={busy} className="bg-card">
-            <WalletIcon aria-hidden /> Đổi ví <ChevronDown aria-hidden />
+            <WalletIcon aria-hidden /> {msg().bulk.changeWallet} <ChevronDown aria-hidden />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-48">
           {wallets.map((w) => (
-            <DropdownMenuItem key={w.id} onSelect={() => apply({ walletId: w.id }, `chuyển sang ví ${w.name}`)}>
+            <DropdownMenuItem key={w.id} onSelect={() => apply({ walletId: w.id }, msg().bulk.movedToWallet(w.name))}>
               {w.name}
             </DropdownMenuItem>
           ))}
@@ -146,11 +152,11 @@ function BulkBar({
         onClick={() => onDelete(ids)}
         className="bg-card text-danger hover:bg-expense-soft hover:text-danger"
       >
-        <Trash2 aria-hidden /> Xoá
+        <Trash2 aria-hidden /> {msg().bulk.delete}
       </Button>
-      {busy && <Loader2 aria-label="Đang cập nhật" className="size-4 animate-spin text-muted-foreground" />}
+      {busy && <Loader2 aria-label={msg().bulk.updating} className="size-4 animate-spin text-muted-foreground" />}
       <Button variant="ghost" size="sm" onClick={clear} disabled={busy} className="ml-auto text-muted-foreground">
-        <X aria-hidden /> Bỏ chọn
+        <X aria-hidden /> {msg().bulk.clear}
       </Button>
     </div>
   );
@@ -198,13 +204,13 @@ export function TransactionsPage() {
     setDeleting(true);
     try {
       const { removed, xpRemoved } = await transactionService.deleteTransactions(deleteIds);
-      toast.success(`Đã xoá ${removed} giao dịch`, {
-        description: xpRemoved ? `Trừ lại ${xpRemoved} XP đã cộng cho các giao dịch ghi hôm nay.` : undefined,
+      toast.success(msg().bulk.deleted(removed), {
+        description: xpRemoved ? msg().bulk.xpRemoved(xpRemoved) : undefined,
       });
       if (openId && deleteIds.includes(openId)) closeTransaction();
       setDeleteIds(null);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Xoá chưa thành công, bạn thử lại nhé.");
+      toast.error(e instanceof Error ? te(e.message) : msg().bulk.deleteFailed);
     } finally {
       setDeleting(false);
     }
@@ -215,7 +221,7 @@ export function TransactionsPage() {
 
   let body: React.ReactNode;
   if (list.error && !list.data) {
-    body = <ErrorState title="Không tải được danh sách giao dịch" error={list.error} onRetry={list.refetch} className="min-h-[420px]" />;
+    body = <ErrorState title={msg().loadFailed} error={list.error} onRetry={list.refetch} className="min-h-[420px]" />;
   } else if (list.loading) {
     body = <TableSkeleton />;
   } else if (data.length === 0) {
@@ -223,11 +229,11 @@ export function TransactionsPage() {
       <EmptyState
         icon={SearchX}
         className="min-h-[420px]"
-        title="Không có giao dịch khớp bộ lọc"
-        description="Thử nới khoảng thời gian, bỏ bớt điều kiện lọc hoặc đổi từ khoá tìm kiếm."
+        title={msg().emptyFilteredTitle}
+        description={msg().emptyFilteredText}
         action={
           <Button variant="outline" onClick={reset}>
-            Xoá bộ lọc
+            {msg().filters.reset}
           </Button>
         }
       />
@@ -235,15 +241,15 @@ export function TransactionsPage() {
       <EmptyState
         icon={ReceiptText}
         className="min-h-[420px]"
-        title="Chưa có giao dịch nào trong tháng này"
-        description="Gõ một câu như “ăn phở 45k” vào ô Ghi nhanh, AI sẽ lo phần còn lại."
+        title={msg().emptyTitle}
+        description={msg().emptyText}
         action={
           <div className="flex flex-wrap justify-center gap-2">
             <Button onClick={openQuickAdd}>
-              <Plus aria-hidden /> Ghi giao dịch
+              <Plus aria-hidden /> {msg().add}
             </Button>
             <Button variant="outline" onClick={() => update({ period: "tat-ca" })}>
-              <CalendarRange aria-hidden /> Xem mọi thời gian
+              <CalendarRange aria-hidden /> {msg().viewAllTime}
             </Button>
           </div>
         }
@@ -278,11 +284,11 @@ export function TransactionsPage() {
     <div className="mx-auto flex max-w-[1600px] flex-col gap-5 px-4 py-6 md:px-6 xl:px-8 xl:py-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl leading-8 font-bold">Giao dịch</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Xem, lọc, sửa và duyệt các khoản thu chi của bạn.</p>
+          <h1 className="text-2xl leading-8 font-bold">{msg().title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{msg().subtitle}</p>
         </div>
         <Button onClick={openQuickAdd} className="max-md:h-11">
-          <Plus aria-hidden /> Ghi giao dịch
+          <Plus aria-hidden /> {msg().add}
         </Button>
       </div>
 
@@ -292,13 +298,13 @@ export function TransactionsPage() {
             value="tat-ca"
             className="flex-none px-1 text-muted-foreground after:bg-primary data-active:text-primary"
           >
-            Tất cả
+            {msg().tabAll}
           </TabsTrigger>
           <TabsTrigger
             value="cho-duyet"
             className="flex-none gap-2 px-1 text-muted-foreground after:bg-primary data-active:text-primary"
           >
-            Chờ duyệt
+            {msg().tabPending}
             {!!pendingCount && (
               <span className="num inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-info px-1.5 text-xs font-semibold text-white">
                 {pendingCount}
@@ -318,14 +324,14 @@ export function TransactionsPage() {
           />
           {list.error && list.data && (
             <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-expense-soft px-4 py-2.5 text-sm">
-              <span>Chưa cập nhật được danh sách. {list.error.message}</span>
+              <span>{msg().refreshFailed} {te(list.error.message)}</span>
               <Button variant="outline" size="sm" onClick={list.refetch} className="bg-card">
-                Thử lại
+                {getMessages(commonMessages).retry}
               </Button>
             </div>
           )}
           <section
-            aria-label="Bảng giao dịch"
+            aria-label={msg().tableRegion}
             aria-busy={list.fetching}
             className="relative overflow-clip rounded-xl border bg-card"
           >
@@ -342,7 +348,7 @@ export function TransactionsPage() {
         </TabsContent>
 
         <TabsContent value="cho-duyet" className="mt-4">
-          <section aria-label="Giao dịch chờ duyệt" className="overflow-clip rounded-xl border bg-card">
+          <section aria-label={msg().pendingRegion} className="overflow-clip rounded-xl border bg-card">
             <PendingReview categories={categories} onOpen={openTransaction} />
           </section>
         </TabsContent>
@@ -360,14 +366,14 @@ export function TransactionsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Xoá <span className="num">{deleteIds?.length}</span> giao dịch?
+              <span className="num">{msg().bulk.confirmTitle(deleteIds?.length ?? 0)}</span>
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Các giao dịch đã chọn sẽ bị xoá và số dư ví được tính lại. Không hoàn tác được.
+              {msg().bulk.confirmText}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Giữ lại</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{msg().keep}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={deleting}
@@ -377,7 +383,7 @@ export function TransactionsPage() {
               }}
             >
               {deleting && <Loader2 aria-hidden className="animate-spin" />}
-              Xoá
+              {msg().bulk.delete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

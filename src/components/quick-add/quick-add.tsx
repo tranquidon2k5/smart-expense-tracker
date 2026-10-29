@@ -10,8 +10,10 @@ import { cn } from "@/lib/utils";
 import { useQuickAdd } from "./quick-add-provider";
 import { QuickEntryPreviewForm } from "./quick-entry-preview";
 import { useQuickEntry } from "./use-quick-entry";
+import { getMessages } from "@/i18n/core";
+import { quickAddMessages } from "@/i18n/messages/quick-add";
 
-const PLACEHOLDER = "Ghi nhanh: hôm qua ăn phở 45k với Nam";
+const msg = () => getMessages(quickAddMessages);
 
 /** Ô Ghi nhanh trên thanh trên (≥ 768px). Phím tắt N. Kết quả AI hiện trong popover. */
 export function QuickAddBar({ className }: { className?: string }) {
@@ -25,7 +27,7 @@ export function QuickAddBar({ className }: { className?: string }) {
       <PopoverAnchor asChild>
         <form
           role="search"
-          aria-label="Ghi nhanh giao dịch"
+          aria-label={msg().formLabel}
           onSubmit={(e) => {
             e.preventDefault();
             entry.parse();
@@ -37,8 +39,8 @@ export function QuickAddBar({ className }: { className?: string }) {
             ref={inputRef}
             value={entry.text}
             onChange={(e) => entry.setText(e.target.value)}
-            placeholder={PLACEHOLDER}
-            aria-label="Ghi nhanh bằng câu tự nhiên, nhấn Enter để phân tích"
+            placeholder={msg().placeholder}
+            aria-label={msg().inputLabel}
             aria-describedby={entry.error && !open ? errorId : undefined}
             aria-invalid={(entry.error && !open) || undefined}
             disabled={entry.status === "parsing"}
@@ -48,7 +50,7 @@ export function QuickAddBar({ className }: { className?: string }) {
           <span className="pointer-events-none absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1.5 text-xs text-muted-foreground">
             {entry.status === "parsing" ? (
               <span role="status" aria-live="polite" className="inline-flex items-center gap-1.5">
-                <Loader2 aria-hidden className="size-3.5 animate-spin" /> Đang phân tích…
+                <Loader2 aria-hidden className="size-3.5 animate-spin" /> {msg().parsing}
               </span>
             ) : (
               <kbd aria-hidden className="num rounded border bg-card px-1.5 py-0.5 text-[11px] font-medium">
@@ -74,7 +76,7 @@ export function QuickAddBar({ className }: { className?: string }) {
         }}
       >
         <div className="mb-4">
-          <p className="text-[15px] font-semibold">Xem trước giao dịch</p>
+          <p className="text-[15px] font-semibold">{msg().previewTitle}</p>
           <p className="mt-0.5 truncate text-[13px] text-muted-foreground">“{entry.preview?.rawText}”</p>
         </div>
         {entry.preview && (
@@ -108,8 +110,8 @@ export function QuickAddDialog() {
     >
       <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-md max-sm:top-auto max-sm:bottom-0 max-sm:max-w-full max-sm:translate-y-0 max-sm:rounded-b-none max-sm:pb-[calc(16px+env(safe-area-inset-bottom))]">
         <DialogHeader>
-          <DialogTitle>Ghi nhanh</DialogTitle>
-          <DialogDescription>Gõ một câu, AI sẽ tách số tiền, ngày và danh mục giúp bạn.</DialogDescription>
+          <DialogTitle>{msg().dialogTitle}</DialogTitle>
+          <DialogDescription>{msg().dialogText}</DialogDescription>
         </DialogHeader>
         {entry.preview ? (
           <QuickEntryPreviewForm
@@ -129,14 +131,14 @@ export function QuickAddDialog() {
             className="flex flex-col gap-3"
           >
             <label htmlFor={inputId} className="sr-only">
-              Câu mô tả giao dịch
+              {msg().sentenceLabel}
             </label>
             <Input
               id={inputId}
               autoFocus
               value={entry.text}
               onChange={(e) => entry.setText(e.target.value)}
-              placeholder={PLACEHOLDER}
+              placeholder={msg().placeholder}
               autoComplete="off"
               aria-invalid={!!entry.error || undefined}
             />
@@ -149,11 +151,11 @@ export function QuickAddDialog() {
             <Button type="submit" className="h-11" disabled={entry.status === "parsing"} aria-busy={entry.status === "parsing"}>
               {entry.status === "parsing" ? (
                 <>
-                  <Loader2 aria-hidden className="animate-spin" /> Đang phân tích…
+                  <Loader2 aria-hidden className="animate-spin" /> {msg().parsing}
                 </>
               ) : (
                 <>
-                  <Sparkles aria-hidden /> Phân tích
+                  <Sparkles aria-hidden /> {msg().analyze}
                 </>
               )}
             </Button>

@@ -3,6 +3,8 @@
 import * as React from "react"
 import { Command as CommandPrimitive } from "cmdk"
 import { cn } from "cn"
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
 
 import {
   Dialog,
@@ -34,8 +36,8 @@ function Command({
 }
 
 function CommandDialog({
-  title = "Tìm kiếm",
-  description = "Tìm trang hoặc giao dịch",
+  title = getMessages(commonMessages).searchDefault.title,
+  description = getMessages(commonMessages).searchDefault.description,
   children,
   className,
   showCloseButton = false,
@@ -95,6 +97,7 @@ function CommandList({
   return (
     <CommandPrimitive.List
       data-slot="command-list"
+      aria-label={getMessages(commonMessages).suggestions}
       className={cn(
         "no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
         className

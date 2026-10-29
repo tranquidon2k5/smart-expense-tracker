@@ -29,6 +29,12 @@ import { budgetService, transactionService } from "@/services";
 import { budgetStatus } from "@/lib/budget-status";
 import { formatDate, formatMoney, formatMonthLong, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { budgetsMessages } from "@/i18n/messages/budgets";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(budgetsMessages);
 
 /** Thanh tiến độ + chữ, có role progressbar */
 function BudgetBar({ row }: { row: BudgetRow }) {
@@ -38,11 +44,11 @@ function BudgetBar({ row }: { row: BudgetRow }) {
     <div className="flex min-w-0 flex-col gap-1.5">
       <div
         role="progressbar"
-        aria-label={`Mức dùng ngân sách ${row.category.name}`}
+        aria-label={msg().usage(row.category.name)}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(pct)}
-        aria-valuetext={`Đã dùng ${formatMoney(row.spent)} trên ${formatMoney(row.budget.limitAmount)}, ${formatPercent(pct)}`}
+        aria-valuetext={msg().valueText(formatMoney(row.spent), formatMoney(row.budget.limitAmount), formatPercent(pct))}
         className="relative h-2 overflow-hidden rounded-full bg-muted"
       >
         <div className={cn("h-full rounded-full transition-[width] duration-300", status.barClass)} style={{ width: `${Math.min(100, pct)}%` }} />
@@ -67,7 +73,7 @@ function StatusCell({ row }: { row: BudgetRow }) {
           {status.label} · <span className="num">{formatPercent(row.ratio * 100)}</span>
         </span>
         <span className="num text-xs text-muted-foreground">
-          {remaining >= 0 ? `Còn ${formatMoney(remaining)}` : `Vượt ${formatMoney(-remaining)}`}
+          {remaining >= 0 ? msg().left(formatMoney(remaining)) : msg().over(formatMoney(-remaining))}
         </span>
       </span>
     </div>
@@ -90,15 +96,15 @@ function InlineLimit({ row }: { row: BudgetRow }) {
   };
 
   const save = async () => {
-    if (!value || value <= 0) return setError("Hạn mức phải lớn hơn 0đ.");
+    if (!value || value <= 0) return setError(msg().limitPositive(formatMoney(0)));
     if (value === row.budget.limitAmount) return close();
     setSaving(true);
     try {
       await budgetService.setBudget(row.category.id, value);
-      toast.success(`Đã đổi hạn mức ${row.category.name} thành ${formatMoney(value)}`);
+      toast.success(msg().changed(row.category.name, formatMoney(value)));
       close();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chưa lưu được, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().saveFailed);
     } finally {
       setSaving(false);
     }
@@ -112,8 +118,8 @@ function InlineLimit({ row }: { row: BudgetRow }) {
           ref={editBtn}
           variant="ghost"
           size="icon-sm"
-          aria-label={`Sửa hạn mức ${row.category.name}`}
-          title="Sửa hạn mức"
+          aria-label={msg().editFor(row.category.name)}
+          title={msg().edit}
           onClick={() => {
             setValue(row.budget.limitAmount);
             setEditing(true);
@@ -146,16 +152,16 @@ function InlineLimit({ row }: { row: BudgetRow }) {
             autoFocus
             value={value}
             onChange={setValue}
-            aria-label={`Hạn mức mới cho ${row.category.name}`}
+            aria-label={msg().newLimitFor(row.category.name)}
             aria-invalid={!!error || undefined}
             aria-describedby={error ? errorId : undefined}
             disabled={saving}
           />
         </div>
-        <Button type="submit" size="icon-sm" aria-label="Lưu hạn mức (Enter)" disabled={saving} className="max-md:size-11">
+        <Button type="submit" size="icon-sm" aria-label={msg().saveLimitKey} disabled={saving} className="max-md:size-11">
           {saving ? <Loader2 aria-hidden className="animate-spin" /> : <Check aria-hidden />}
         </Button>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Huỷ (Esc)" onClick={close} disabled={saving} className="max-md:size-11">
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={msg().cancelKey} onClick={close} disabled={saving} className="max-md:size-11">
           <X aria-hidden />
         </Button>
       </div>
@@ -187,17 +193,17 @@ function AddBudgetForm({
   const selected = overview.unbudgeted.find((u) => u.category.id === categoryId);
 
   const save = async () => {
-    if (!categoryId) return setError("Chọn danh mục.");
-    if (!amount || amount <= 0) return setError("Nhập hạn mức lớn hơn 0đ.");
+    if (!categoryId) return setError(msg().pickCategory);
+    if (!amount || amount <= 0) return setError(msg().amountPositive(formatMoney(0)));
     setError(null);
     setSaving(true);
     try {
       await budgetService.setBudget(categoryId, amount);
-      toast.success(`Đã đặt hạn mức ${selected?.category.name ?? ""}: ${formatMoney(amount)}/tháng`);
+      toast.success(msg().set(selected?.category.name ?? "", formatMoney(amount)));
       setAmount(undefined);
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chưa lưu được, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().saveFailed);
     } finally {
       setSaving(false);
     }
@@ -216,16 +222,16 @@ function AddBudgetForm({
         }
       }}
       className="flex flex-col gap-3 border-t bg-surface-subtle px-4 py-4 md:px-5"
-      aria-label="Đặt hạn mức mới"
+      aria-label={msg().newLimit}
     >
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-full sm:w-56">
           <label htmlFor={`${ids}-cat`} className="mb-1.5 block text-[13px] font-medium">
-            Danh mục
+            {msg().category}
           </label>
           <Select value={categoryId} onValueChange={onCategoryChange}>
             <SelectTrigger id={`${ids}-cat`} className="w-full bg-card">
-              <SelectValue placeholder="Chọn danh mục chi" />
+              <SelectValue placeholder={msg().pickExpenseCategory} />
             </SelectTrigger>
             <SelectContent>
               {overview.unbudgeted.map(({ category }) => (
@@ -238,17 +244,17 @@ function AddBudgetForm({
         </div>
         <div className="w-full sm:w-48">
           <label htmlFor={`${ids}-amt`} className="mb-1.5 block text-[13px] font-medium">
-            Hạn mức tháng
+            {msg().monthlyLimit}
           </label>
           <AmountInput id={`${ids}-amt`} autoFocus={!!categoryId} value={amount} onChange={setAmount} className="bg-card" />
         </div>
         <div className="flex gap-2">
           <Button type="button" variant="ghost" onClick={onDone} disabled={saving} className="max-md:h-11">
-            Huỷ
+            {getMessages(commonMessages).cancel}
           </Button>
           <Button type="submit" disabled={saving} aria-busy={saving} className="max-md:h-11">
             {saving && <Loader2 aria-hidden className="animate-spin" />}
-            Lưu hạn mức
+            {msg().saveLimit}
           </Button>
         </div>
       </div>
@@ -256,7 +262,7 @@ function AddBudgetForm({
         <p className="text-[13px] text-muted-foreground">
           {selected.avgSpendLast3Months > 0 ? (
             <>
-              Gợi ý: 3 tháng gần đây bạn chi trung bình{" "}
+              {msg().hintBefore}{" "}
               <button
                 type="button"
                 className="num font-medium text-primary underline-offset-4 hover:underline"
@@ -264,16 +270,16 @@ function AddBudgetForm({
               >
                 {formatMoney(selected.avgSpendLast3Months)}
               </button>
-              /tháng cho {selected.category.name}
+              {msg().hintFor(selected.category.name)}
               {selected.spent > 0 && (
                 <>
-                  , tháng này đã chi <span className="num">{formatMoney(selected.spent)}</span>
+                  {msg().hintSpent} <span className="num">{formatMoney(selected.spent)}</span>
                 </>
               )}
               .
             </>
           ) : (
-            "Chưa có số liệu chi của danh mục này trong 3 tháng gần đây."
+            msg().noHistory
           )}
         </p>
       )}
@@ -293,26 +299,26 @@ function Summary({ overview, today }: { overview: BudgetOverview; today: string 
   const warn = overview.rows.filter((r) => r.ratio >= 0.8 && r.ratio <= 1).length;
   const remaining = overview.totalLimit - overview.totalSpent;
   return (
-    <section aria-label="Tổng quan ngân sách" className="grid gap-4 rounded-xl border bg-card p-4 md:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.4fr)] md:p-5">
+    <section aria-label={msg().overviewLabel} className="grid gap-4 rounded-xl border bg-card p-4 md:grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.4fr)] md:p-5">
       <div>
-        <p className="text-[13px] text-muted-foreground">Tổng hạn mức</p>
+        <p className="text-[13px] text-muted-foreground">{msg().totalLimit}</p>
         <Money amount={overview.totalLimit} className="mt-1 block text-2xl leading-8 font-semibold" />
       </div>
       <div>
-        <p className="text-[13px] text-muted-foreground">Đã chi</p>
+        <p className="text-[13px] text-muted-foreground">{msg().spent}</p>
         <Money amount={overview.totalSpent} className="mt-1 block text-2xl leading-8 font-semibold" />
         <p className="mt-0.5 text-xs text-muted-foreground">
-          đến <span className="num">{formatDate(today)}</span>
+          {msg().upTo} <span className="num">{formatDate(today)}</span>
         </p>
       </div>
       <div>
-        <p className="text-[13px] text-muted-foreground">{remaining >= 0 ? "Còn lại" : "Vượt tổng hạn mức"}</p>
+        <p className="text-[13px] text-muted-foreground">{remaining >= 0 ? msg().remaining : msg().overTotal}</p>
         <Money amount={Math.abs(remaining)} className={cn("mt-1 block text-2xl leading-8 font-semibold", remaining < 0 && "text-danger")} />
       </div>
       <div className="flex flex-col justify-center gap-2">
         <div
           role="progressbar"
-          aria-label="Mức dùng tổng ngân sách"
+          aria-label={msg().totalUsage}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(ratio * 100)}
@@ -322,24 +328,24 @@ function Summary({ overview, today }: { overview: BudgetOverview; today: string 
         </div>
         <p className="flex flex-wrap gap-x-3 gap-y-1 text-[13px]">
           <span className="text-muted-foreground">
-            Đã dùng <span className="num">{formatPercent(ratio * 100)}</span>
+            {msg().used} <span className="num">{formatPercent(ratio * 100)}</span>
           </span>
           {over > 0 && (
             <span className="inline-flex items-center gap-1 font-medium text-danger">
               <CircleAlert aria-hidden className="size-4" />
-              <span className="num">{over}</span> vượt hạn mức
+              <span className="num">{over}</span> {msg().overCount}
             </span>
           )}
           {warn > 0 && (
             <span className="inline-flex items-center gap-1 font-medium text-warning">
               <TriangleAlert aria-hidden className="size-4" />
-              <span className="num">{warn}</span> sắp chạm hạn mức
+              <span className="num">{warn}</span> {msg().nearCount}
             </span>
           )}
           {over === 0 && warn === 0 && overview.rows.length > 0 && (
             <span className="inline-flex items-center gap-1 text-muted-foreground">
               <CircleCheck aria-hidden className="size-4 text-primary" />
-              Mọi danh mục đều trong hạn mức
+              {msg().allOk}
             </span>
           )}
         </p>
@@ -374,10 +380,10 @@ export function BudgetsPage() {
     setDeleting(true);
     try {
       await budgetService.deleteBudget(deleteRow.budget.id);
-      toast.success(`Đã bỏ hạn mức ${deleteRow.category.name}`);
+      toast.success(msg().removed(deleteRow.category.name));
       setDeleteRow(null);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Chưa xoá được, bạn thử lại nhé.");
+      toast.error(e instanceof Error ? te(e.message) : msg().removeFailed);
     } finally {
       setDeleting(false);
     }
@@ -388,17 +394,17 @@ export function BudgetsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title={`Ngân sách ${formatMonthLong(month).toLowerCase()}`}
+        title={msg().title(formatMonthLong(month))}
         description={
           <>
-            Đặt hạn mức chi cho từng danh mục. Cảnh báo khi dùng tới <span className="num">80%</span> và khi vượt{" "}
+            {msg().introBefore} <span className="num">80%</span> {msg().introMiddle}{" "}
             <span className="num">100%</span>.
           </>
         }
         actions={
           canAdd && (
             <Button ref={addButtonRef} onClick={() => startAdd()} disabled={adding} className="max-md:h-11">
-              <Plus aria-hidden /> Đặt hạn mức
+              <Plus aria-hidden /> {msg().add}
             </Button>
           )
         }
@@ -406,7 +412,7 @@ export function BudgetsPage() {
 
       {query.error && !data ? (
         <section className="rounded-xl border bg-card">
-          <ErrorState title="Không tải được ngân sách" error={query.error} onRetry={query.refetch} className="min-h-[360px]" />
+          <ErrorState title={msg().loadFailed} error={query.error} onRetry={query.refetch} className="min-h-[360px]" />
         </section>
       ) : query.loading || !data ? (
         <div aria-hidden className="flex flex-col gap-5">
@@ -428,20 +434,20 @@ export function BudgetsPage() {
           {data.rows.length > 0 && <Summary overview={data} today={today} />}
 
           <Panel
-            title="Hạn mức theo danh mục"
-            description={data.rows.length ? "Sắp xếp theo mức dùng, cao nhất trước. Bấm biểu tượng bút để sửa hạn mức." : undefined}
+            title={msg().byCategory}
+            description={data.rows.length ? msg().byCategoryHint : undefined}
             className="p-0 md:p-0 [&>header]:px-4 [&>header]:pt-4 md:[&>header]:px-5 md:[&>header]:pt-5"
           >
             {data.rows.length === 0 && !adding ? (
               <EmptyState
                 icon={PiggyBank}
                 className="min-h-[300px]"
-                title="Chưa đặt ngân sách tháng này"
-                description="Đặt hạn mức cho vài danh mục chi lớn như Ăn uống, Mua sắm để biết khi nào cần chậm lại."
+                title={msg().emptyTitle}
+                description={msg().emptyText}
                 action={
                   canAdd && (
                     <Button onClick={() => startAdd()}>
-                      <Plus aria-hidden /> Đặt hạn mức đầu tiên
+                      <Plus aria-hidden /> {msg().addFirst}
                     </Button>
                   )
                 }
@@ -449,7 +455,7 @@ export function BudgetsPage() {
             ) : (
               <>
                 {data.rows.length > 0 && (
-                  <ul aria-label="Hạn mức theo danh mục" className={cn("border-t", query.fetching && "opacity-80")}>
+                  <ul aria-label={msg().byCategory} className={cn("border-t", query.fetching && "opacity-80")}>
                     {data.rows.map((row) => (
                       <li
                         key={row.budget.id}
@@ -460,7 +466,7 @@ export function BudgetsPage() {
                           <p className="truncate text-[15px] font-medium">{row.category.name}</p>
                           {row.avgSpendLast3Months > 0 && (
                             <p className="num text-xs text-muted-foreground">
-                              TB 3 tháng: {formatMoney(row.avgSpendLast3Months)}
+                              {msg().avg3(formatMoney(row.avgSpendLast3Months))}
                             </p>
                           )}
                         </div>
@@ -474,8 +480,8 @@ export function BudgetsPage() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label={`Bỏ hạn mức ${row.category.name}`}
-                          title="Bỏ hạn mức"
+                          aria-label={msg().removeFor(row.category.name)}
+                          title={msg().remove}
                           onClick={() => setDeleteRow(row)}
                           className="text-muted-foreground hover:bg-expense-soft hover:text-danger max-md:size-11"
                         >
@@ -496,7 +502,7 @@ export function BudgetsPage() {
           </Panel>
 
           {data.unbudgeted.length > 0 && (
-            <Panel title="Danh mục chưa có hạn mức" description="Các danh mục chi này chưa được giới hạn trong tháng.">
+            <Panel title={msg().unbudgeted} description={msg().unbudgetedHint}>
               <ul className="flex flex-wrap gap-2">
                 {data.unbudgeted.map((u) => (
                   <li key={u.category.id}>
@@ -508,9 +514,9 @@ export function BudgetsPage() {
                       <CategoryIcon icon={u.category.icon} color={u.category.color} size="sm" />
                       <span>{u.category.name}</span>
                       {u.spent > 0 && (
-                        <span className="num text-xs text-muted-foreground">đã chi {formatMoney(u.spent)}</span>
+                        <span className="num text-xs text-muted-foreground">{msg().spentSoFar(formatMoney(u.spent))}</span>
                       )}
-                      <Plus aria-label="Đặt hạn mức" className="size-4 text-primary" />
+                      <Plus aria-label={msg().add} className="size-4 text-primary" />
                     </button>
                   </li>
                 ))}
@@ -523,13 +529,13 @@ export function BudgetsPage() {
       <AlertDialog open={!!deleteRow} onOpenChange={(o) => !o && !deleting && setDeleteRow(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Bỏ hạn mức {deleteRow?.category.name}?</AlertDialogTitle>
+            <AlertDialogTitle>{msg().confirmTitle(deleteRow?.category.name ?? "")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Danh mục sẽ không còn cảnh báo khi chi gần hết. Các giao dịch vẫn giữ nguyên.
+              {msg().confirmText}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Giữ lại</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{msg().keep}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={deleting}
@@ -539,7 +545,7 @@ export function BudgetsPage() {
               }}
             >
               {deleting && <Loader2 aria-hidden className="animate-spin" />}
-              Bỏ hạn mức
+              {msg().remove}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

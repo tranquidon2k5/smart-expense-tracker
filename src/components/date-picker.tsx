@@ -3,14 +3,19 @@
 import { CalendarDays } from "lucide-react";
 import * as React from "react";
 import type { DateRange } from "react-day-picker";
+import { enUS } from "react-day-picker/locale/en-US";
 import { vi } from "react-day-picker/locale/vi";
+import { getActiveLocale } from "@/i18n/core";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { dateToIso, formatDate, isoToDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-/** Chọn một ngày, hiển thị dd/MM/yyyy, lịch tiếng Việt bắt đầu thứ Hai */
+/** Lịch theo ngôn ngữ giao diện; cả hai ngôn ngữ đều bắt đầu tuần từ thứ Hai */
+const calendarLocale = () => (getActiveLocale() === "vi" ? vi : enUS);
+
+/** Chọn một ngày, hiển thị dd/MM/yyyy, tuần bắt đầu thứ Hai */
 export function DatePicker({
   id,
   value,
@@ -37,7 +42,7 @@ export function DatePicker({
       <PopoverContent className="w-auto rounded-xl p-0" align="start">
         <Calendar
           mode="single"
-          locale={vi}
+          locale={calendarLocale()}
           weekStartsOn={1}
           selected={isoToDate(value)}
           defaultMonth={isoToDate(value)}
@@ -71,7 +76,7 @@ export function RangeCalendar({
   return (
     <Calendar
       mode="range"
-      locale={vi}
+      locale={calendarLocale()}
       weekStartsOn={1}
       numberOfMonths={2}
       selected={selected}

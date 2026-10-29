@@ -12,42 +12,42 @@ import { Panel } from "@/components/panel";
 import { importService, transactionService } from "@/services";
 import { cn } from "@/lib/utils";
 import { CsvPreviewTable } from "./csv-preview-table";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { importMessages } from "@/i18n/messages/import";
+import { te } from "@/i18n/errors";
 
-const FIELD_HELP: Record<ImportField, string> = {
-  date: "Ngày phát sinh giao dịch",
-  amount: "Số tiền của từng giao dịch, không phải số dư",
-  description: "Nội dung / diễn giải, dùng để AI phân loại",
-};
+const msg = () => getMessages(importMessages);
 
-const AMOUNT_MODES: { value: AmountMode; label: string; help: string }[] = [
-  { value: "signed", label: "Số âm là chi, số dương là thu", help: "Sao kê tài khoản ngân hàng thường ghi kiểu này" },
-  { value: "all_expense", label: "Tất cả là khoản chi", help: "Sao kê thẻ tín dụng, ví chỉ ghi số dương" },
-];
+const fieldHelp = (f: ImportField) => msg().mapping.help[f];
+
+const amountModes = (): { value: AmountMode; label: string; help: string }[] =>
+  (["signed", "all_expense"] as const).map((value) => ({ value, ...msg().mapping.modes[value] }));
 
 export function ErrorList({ errors, limit }: { errors: ImportRowError[]; limit?: number }) {
   const shown = limit ? errors.slice(0, limit) : errors;
   return (
-    <Table aria-label="Các dòng không đọc được" containerClassName="max-h-[320px] overflow-y-auto rounded-lg border">
+    <Table aria-label={msg().mapping.errorsLabel} containerClassName="max-h-[320px] overflow-y-auto rounded-lg border">
       <TableHeader className="sticky top-0 z-10">
         <TableRow className="bg-surface-subtle hover:bg-surface-subtle">
-          <TableHead className="w-16 px-3 text-right">Dòng</TableHead>
-          <TableHead className="w-24 px-3">Cột</TableHead>
-          <TableHead className="px-3">Giá trị trong file</TableHead>
-          <TableHead className="px-3">Vấn đề</TableHead>
+          <TableHead className="w-16 px-3 text-right">{msg().row}</TableHead>
+          <TableHead className="w-24 px-3">{msg().mapping.column}</TableHead>
+          <TableHead className="px-3">{msg().mapping.value}</TableHead>
+          <TableHead className="px-3">{msg().mapping.problem}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {shown.map((e) => (
           <TableRow key={`${e.line}-${e.field}`}>
             <TableCell className="num px-3 text-right font-medium">{e.line}</TableCell>
-            <TableCell className="px-3">{importService.FIELD_LABEL[e.field]}</TableCell>
+            <TableCell className="px-3">{msg().fields[e.field]}</TableCell>
             <TableCell className="num max-w-[200px] truncate px-3" title={e.value}>
-              {e.value ? `“${e.value}”` : <span className="text-muted-foreground">(trống)</span>}
+              {e.value ? `“${e.value}”` : <span className="text-muted-foreground">{msg().empty}</span>}
             </TableCell>
             <TableCell className="px-3">
               <span className="flex items-center gap-1.5 text-danger">
                 <CircleAlert aria-hidden className="size-4 shrink-0" />
-                <span className="text-foreground">{e.message}</span>
+                <span className="text-foreground">{te(e.message)}</span>
               </span>
             </TableCell>
           </TableRow>
@@ -108,7 +108,7 @@ export function MappingStep({
 
   return (
     <div className="grid grid-cols-1 items-start gap-4 md:gap-5 xl:grid-cols-12 xl:gap-6">
-      <Panel title="Ánh xạ cột" description="Sổ Tiền đã tự nhận diện cột, bạn kiểm tra lại nhé." className="xl:col-span-4">
+      <Panel title={msg().mapping.title} description={msg().mapping.intro} className="xl:col-span-4">
         <form
           noValidate
           onSubmit={(e) => {
@@ -125,11 +125,11 @@ export function MappingStep({
               <div key={f} className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor={id}>
-                    Cột {importService.FIELD_LABEL[f].toLowerCase()} <span className="text-danger" aria-hidden>*</span>
+                    {msg().mapping.columnOf(msg().fields[f])} <span className="text-danger" aria-hidden>*</span>
                   </Label>
                   {auto && (
                     <span className="flex items-center gap-1 text-xs text-info">
-                      <Sparkles aria-hidden className="size-3.5" /> Tự nhận diện
+                      <Sparkles aria-hidden className="size-3.5" /> {msg().mapping.auto}
                     </span>
                   )}
                 </div>
@@ -143,28 +143,28 @@ export function MappingStep({
                     aria-invalid={!!err}
                     aria-describedby={`${id}-help`}
                   >
-                    <SelectValue placeholder="Chọn cột…" />
+                    <SelectValue placeholder={msg().mapping.pickColumn} />
                   </SelectTrigger>
                   <SelectContent>
                     {parsed.headers.map((h, i) => (
                       <SelectItem key={i} value={String(i)}>
                         {h}
-                        <span className="text-muted-foreground"> · {parsed.rows[0]?.[i] || "(trống)"}</span>
+                        <span className="text-muted-foreground"> · {parsed.rows[0]?.[i] || msg().empty}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p id={`${id}-help`} className={cn("flex items-center gap-1 text-xs", err ? "text-danger" : "text-muted-foreground")}>
                   {err && <CircleAlert aria-hidden className="size-3.5 shrink-0" />}
-                  {err ?? FIELD_HELP[f]}
+                  {te(err) ?? fieldHelp(f)}
                 </p>
               </div>
             );
           })}
 
           <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1.5 text-sm font-medium">Cách đọc số tiền</legend>
-            {AMOUNT_MODES.map((m) => (
+            <legend className="mb-1.5 text-sm font-medium">{msg().mapping.amountMode}</legend>
+            {amountModes().map((m) => (
               <label
                 key={m.value}
                 className={cn(
@@ -190,14 +190,14 @@ export function MappingStep({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="map-wallet">
-              Nhập vào ví <span className="text-danger" aria-hidden>*</span>
+              {msg().mapping.wallet} <span className="text-danger" aria-hidden>*</span>
             </Label>
             {walletsLoading ? (
               <Skeleton className="h-9 w-full" />
             ) : (
               <Select value={walletId ?? ""} onValueChange={(v) => onChange({ walletId: v })}>
                 <SelectTrigger id="map-wallet" className="w-full" aria-invalid={submitted && !walletId} aria-describedby="map-wallet-help">
-                  <SelectValue placeholder="Chọn ví nhận giao dịch…" />
+                  <SelectValue placeholder={msg().mapping.pickWallet} />
                 </SelectTrigger>
                 <SelectContent>
                   {wallets?.map((w) => (
@@ -213,7 +213,7 @@ export function MappingStep({
               className={cn("flex items-center gap-1 text-xs", submitted && !walletId ? "text-danger" : "text-muted-foreground")}
             >
               {submitted && !walletId && <CircleAlert aria-hidden className="size-3.5 shrink-0" />}
-              {submitted && !walletId ? "Chọn ví để nhập giao dịch" : "Giao dịch trùng được so với các giao dịch đã có trong ví này"}
+              {submitted && !walletId ? msg().mapping.walletRequired : msg().mapping.walletHelp}
             </p>
           </div>
 
@@ -221,24 +221,24 @@ export function MappingStep({
             <div role="alert" className="flex items-start gap-2 rounded-lg bg-expense-soft px-3 py-2.5 text-sm">
               <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-danger" />
               <div>
-                <p className="font-medium">Chưa nhập được giao dịch</p>
-                <p className="mt-0.5">{error.message} Sổ của bạn chưa bị thay đổi.</p>
+                <p className="font-medium">{msg().mapping.failed}</p>
+                <p className="mt-0.5">{te(error.message)} {msg().mapping.unchanged}</p>
               </div>
             </div>
           )}
 
           <div className="flex flex-wrap justify-between gap-2 border-t pt-4">
             <Button type="button" variant="ghost" onClick={onBack} disabled={importing}>
-              <ArrowLeft aria-hidden /> Quay lại
+              <ArrowLeft aria-hidden /> {getMessages(commonMessages).back}
             </Button>
             <Button type="submit" disabled={importing || (mappingOk && check.candidates.length === 0)}>
               {importing && <Loader2 aria-hidden className="motion-safe:animate-spin" />}
               {importing ? (
-                "Đang nhập…"
+                msg().mapping.importing
               ) : (
                 <span>
-                  {error ? "Thử lại: nhập " : "Nhập "}
-                  <span className="num">{check.candidates.length}</span> dòng
+                  {error ? msg().mapping.retryImport : msg().mapping.import}
+                  <span className="num">{check.candidates.length}</span> {msg().mapping.rows}
                 </span>
               )}
             </Button>
@@ -248,8 +248,8 @@ export function MappingStep({
 
       <div className="flex min-w-0 flex-col gap-4 md:gap-5 xl:col-span-8 xl:gap-6">
         <Panel
-          title="Đọc thử"
-          description={`Áp dụng ánh xạ hiện tại lên toàn bộ ${parsed.rows.length} dòng của ${parsed.fileName}`}
+          title={msg().mapping.previewTitle}
+          description={msg().mapping.previewText(parsed.rows.length, parsed.fileName)}
         >
           <div role="status" aria-live="polite" className="mb-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
             {mappingOk ? (
@@ -257,10 +257,10 @@ export function MappingStep({
                 <span className="flex items-center gap-1.5">
                   <CircleCheck aria-hidden className="size-4 text-success" />
                   <span>
-                    <span className="num font-semibold">{check.candidates.length}</span> dòng đọc được
+                    <span className="num font-semibold">{check.candidates.length}</span> {msg().mapping.readable}
                     <span className="text-muted-foreground">
                       {" "}
-                      (<span className="num">{check.candidates.length - income}</span> chi, <span className="num">{income}</span> thu)
+                      (<span className="num">{check.candidates.length - income}</span> {msg().mapping.expense}, <span className="num">{income}</span> {msg().mapping.income})
                     </span>
                   </span>
                 </span>
@@ -268,7 +268,7 @@ export function MappingStep({
                   <span className="flex items-center gap-1.5">
                     <TriangleAlert aria-hidden className="size-4 text-warning" />
                     <span>
-                      <span className="num font-semibold">{check.errors.length}</span> dòng lỗi sẽ được bỏ qua
+                      <span className="num font-semibold">{check.errors.length}</span> {msg().mapping.badRows}
                     </span>
                   </span>
                 )}
@@ -276,23 +276,23 @@ export function MappingStep({
             ) : (
               <span className="flex items-center gap-1.5 text-danger">
                 <CircleAlert aria-hidden className="size-4" />
-                <span className="text-foreground">Chọn đủ 3 cột khác nhau để đọc thử file.</span>
+                <span className="text-foreground">{msg().mapping.pickThree}</span>
               </span>
             )}
           </div>
           <CsvPreviewTable parsed={parsed} limit={8} mapping={mapping} errorLines={errorLines} />
           {parsed.rows.length > 8 && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Đang hiện 8 trên <span className="num">{parsed.rows.length}</span> dòng.
+              <span className="num">{msg().mapping.showing(parsed.rows.length)}</span>
             </p>
           )}
         </Panel>
 
         {mappingOk && check.errors.length > 0 && (
           <Panel
-            title={`${check.errors.length} dòng không đọc được`}
+            title={msg().mapping.unreadable(check.errors.length)}
             icon={<TriangleAlert aria-hidden className="size-5 text-warning" />}
-            description="Sửa trong file rồi chọn lại file, hoặc tiếp tục nhập — các dòng này sẽ được bỏ qua."
+            description={msg().mapping.unreadableHelp}
           >
             <ErrorList errors={check.errors} />
           </Panel>

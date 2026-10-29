@@ -10,17 +10,24 @@ import * as api from "./api/endpoints";
 
 export { CsvFormatError, checkRows, guessMapping, mappingErrors, FIELD_LABEL, IMPORT_FIELDS } from "./csv-import";
 
-/** File mẫu kèm trong repo (public/mau) để demo */
+import { getMessages } from "@/i18n/core";
+import { importMessages } from "@/i18n/messages/import";
+
+/** File mẫu kèm trong repo (public/mau) để demo; mô tả theo ngôn ngữ giao diện */
 export const SAMPLE_FILES = [
   {
     href: "/mau/sao-ke-techcombank-10-2026.csv",
     name: "sao-ke-techcombank-10-2026.csv",
-    description: "Sao kê Techcombank 01–12/10/2026: có giao dịch trùng và giao dịch AI chưa chắc chắn",
+    get description() {
+      return getMessages(importMessages).file.samples.techcombank;
+    },
   },
   {
     href: "/mau/sao-ke-co-loi.csv",
     name: "sao-ke-co-loi.csv",
-    description: "File có vài dòng ngày/số tiền sai để xem cách báo lỗi",
+    get description() {
+      return getMessages(importMessages).file.samples.errors;
+    },
   },
 ] as const;
 

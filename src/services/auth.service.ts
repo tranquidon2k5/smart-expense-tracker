@@ -19,7 +19,9 @@ import { emitDataChanged } from "./events";
 import { AuthError } from "./errors";
 
 export { AuthError };
-import { PASSWORD_MIN, passwordChecks, validateEmail, validatePassword } from "@shared/validation";
+import { PASSWORD_MAX, PASSWORD_MIN, passwordChecks as checkPassword, validateEmail as checkEmail } from "@shared/validation";
+import { getMessages } from "@/i18n/core";
+import { authMessages } from "@/i18n/messages/auth";
 import { USE_API } from "./data-source";
 import { getApiSession, subscribeApiSession } from "./api/session";
 import * as api from "./api/endpoints";
@@ -31,12 +33,49 @@ export const RESET_CODE_HINT: string | null = USE_API ? null : DEMO_RESET_CODE;
 
 /** Tài khoản demo hiển thị ở trang Đăng nhập */
 export const DEMO_ACCOUNTS = [
-  { label: "Người dùng (Lan)", email: db.LAN_EMAIL, password: DEMO_PASSWORD },
-  { label: "Quản trị viên", email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+  {
+    get label() {
+      return getMessages(authMessages).login.demoUser;
+    },
+    email: db.LAN_EMAIL,
+    password: DEMO_PASSWORD,
+  },
+  {
+    get label() {
+      return getMessages(authMessages).login.demoAdmin;
+    },
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+  },
 ] as const;
 
+export { PASSWORD_MIN };
 
-export { PASSWORD_MIN, passwordChecks, validateEmail, validatePassword };
+// Cùng quy tắc với shared/validation.ts (backend dùng bản đó), câu chữ theo ngôn ngữ giao diện
+
+export function passwordChecks(password: string) {
+  const t = getMessages(authMessages).validation;
+  const [min, letter, digit] = checkPassword(password);
+  return [
+    { label: t.minLength(PASSWORD_MIN), ok: min.ok },
+    { label: t.hasLetter, ok: letter.ok },
+    { label: t.hasDigit, ok: digit.ok },
+  ];
+}
+
+export function validateEmail(email: string): string | null {
+  const t = getMessages(authMessages).validation;
+  if (!checkEmail(email)) return null;
+  return email.trim() ? t.emailFormat : t.emailRequired;
+}
+
+export function validatePassword(password: string): string | null {
+  const t = getMessages(authMessages).validation;
+  if (!password) return t.passwordRequired;
+  if (password.length > PASSWORD_MAX) return t.passwordMax(PASSWORD_MAX);
+  const failed = passwordChecks(password).find((c) => !c.ok);
+  return failed ? t.passwordNeeds(failed.label) : null;
+}
 
 function toSession(user: User): AuthSession {
   return { userId: user.id, role: user.role, email: user.email, fullName: user.fullName };
@@ -91,7 +130,7 @@ export async function register(input: RegisterInput): Promise<AuthSession> {
   if (USE_API) return api.auth.register(input);
   await simulateLatency(700);
   const fullName = input.fullName.trim().replace(/\s+/g, " ");
-  if (fullName.length < 2) throw new AuthError("Nhập họ tên của bạn", "fullName");
+  if (fullName.length < 2) throw new AuthError(getMessages(authMessages).register.nameRequired, "fullName");
   const emailError = validateEmail(input.email);
   if (emailError) throw new AuthError(emailError, "email");
   const passwordError = validatePassword(input.password);
@@ -139,7 +178,7 @@ export async function resetPassword(email: string, code: string, newPassword: st
   if (USE_API) return api.auth.resetPassword(email, code, newPassword);
   await simulateLatency(700);
   const account = findAccountByEmail(email);
-  if (!/^\d{6}$/.test(code.trim())) throw new AuthError("Mã gồm 6 chữ số", "code");
+  if (!/^\d{6}$/.test(code.trim())) throw new AuthError(getMessages(authMessages).forgot.codeFormat, "code");
   if (!account || code.trim() !== DEMO_RESET_CODE) {
     throw new AuthError("Mã chưa đúng hoặc đã hết hạn. Kiểm tra email mới nhất hoặc gửi lại mã.", "code");
   }

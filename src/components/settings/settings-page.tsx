@@ -29,18 +29,17 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { authService, notificationService, settingsService, transactionService } from "@/services";
 import { normalize } from "@/lib/text";
 import { cn } from "@/lib/utils";
-import { PasswordSection, PreferencesSection, ProfileSection } from "./settings-sections";
+import { LanguageSection, PasswordSection, PreferencesSection, ProfileSection } from "./settings-sections";
+import { getMessages } from "@/i18n/core";
+import { settingsMessages } from "@/i18n/messages/settings";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(settingsMessages);
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = ["00", "15", "30", "45"];
 
-const SECTIONS = [
-  { id: "ho-so", label: "Hồ sơ" },
-  { id: "mat-khau", label: "Mật khẩu" },
-  { id: "tuy-chon", label: "Tiền tệ và múi giờ" },
-  { id: "nhac-nho", label: "Nhắc nhở" },
-  { id: "du-lieu", label: "Dữ liệu của bạn" },
-] as const;
+const SECTION_IDS = ["ho-so", "mat-khau", "ngon-ngu", "tuy-chon", "nhac-nho", "du-lieu"] as const;
 
 // ───────────── Nhắc nhở (PRD §6.3, §6.1 "không gây áp lực") ─────────────
 
@@ -60,7 +59,7 @@ function ReminderSection({ initial }: { initial: ReminderSettings }) {
     } catch (e) {
       if (seq === saveSeq.current) {
         setStatus("error");
-        toast.error(e instanceof Error ? e.message : "Không lưu được cài đặt nhắc nhở");
+        toast.error(e instanceof Error ? te(e.message) : msg().reminder.saveFailed);
       }
     }
   };
@@ -68,28 +67,28 @@ function ReminderSection({ initial }: { initial: ReminderSettings }) {
   const sendTest = async () => {
     try {
       await notificationService.sendTestReminder();
-      toast.success("Đã gửi một nhắc nhở thử", { description: "Mở chuông thông báo ở góc trên để xem." });
+      toast.success(msg().reminder.testSent, { description: msg().reminder.testSentHint });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không gửi được");
+      toast.error(e instanceof Error ? te(e.message) : msg().reminder.testFailed);
     }
   };
 
   return (
     <Panel
       id="nhac-nho"
-      title="Nhắc nhở ghi chép"
-      description="Nhắc một lần mỗi ngày nếu tới giờ nhắc mà bạn chưa ghi khoản nào. Không nhắc vào ngày bạn đã ghi."
+      title={msg().reminder.title}
+      description={msg().reminder.intro}
       className="scroll-mt-24"
       action={
         <span role="status" aria-live="polite" className="flex items-center gap-1 text-xs text-muted-foreground">
           {status === "saving" && (
             <>
-              <Loader2 aria-hidden className="size-3.5 motion-safe:animate-spin" /> Đang lưu…
+              <Loader2 aria-hidden className="size-3.5 motion-safe:animate-spin" /> {msg().saving}
             </>
           )}
           {status === "saved" && (
             <>
-              <Check aria-hidden className="size-3.5 text-success" /> Đã lưu
+              <Check aria-hidden className="size-3.5 text-success" /> {msg().saved}
             </>
           )}
         </span>
@@ -99,12 +98,12 @@ function ReminderSection({ initial }: { initial: ReminderSettings }) {
         <div className="flex items-start justify-between gap-4 rounded-lg bg-surface-subtle px-4 py-3">
           <div>
             <Label htmlFor="reminder-enabled" className="text-sm font-medium">
-              Nhắc tôi ghi chép mỗi ngày
+              {msg().reminder.enable}
             </Label>
             <p id="reminder-enabled-help" className="mt-0.5 text-[13px] text-muted-foreground">
               {value.enabled
-                ? "Đang bật."
-                : "Đang tắt hoàn toàn: không có nhắc nhở trong app hay email. Chuỗi ngày và thẻ đóng băng vẫn hoạt động bình thường."}
+                ? msg().reminder.on
+                : msg().reminder.off}
             </p>
           </div>
           <Switch
@@ -119,12 +118,12 @@ function ReminderSection({ initial }: { initial: ReminderSettings }) {
         <fieldset disabled={!value.enabled} className={cn("grid gap-5 sm:grid-cols-2", !value.enabled && "opacity-60")}>
           <div className="flex flex-col gap-1.5">
             <span id="reminder-time-label" className="text-[13px] font-medium">
-              Giờ nhắc
+              {msg().reminder.time}
             </span>
             {/* Hai ô chọn thay cho input type="time" để luôn hiển thị 24 giờ (HH:mm) bất kể ngôn ngữ trình duyệt */}
             <div role="group" aria-labelledby="reminder-time-label" aria-describedby="reminder-time-help" className="flex items-center gap-1.5">
               <Select value={value.time.slice(0, 2)} onValueChange={(h) => void save({ ...value, time: `${h}:${value.time.slice(3, 5)}` })}>
-                <SelectTrigger aria-label="Giờ" className="num w-[76px]">
+                <SelectTrigger aria-label={msg().reminder.hour} className="num w-[76px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="max-h-64">
@@ -139,7 +138,7 @@ function ReminderSection({ initial }: { initial: ReminderSettings }) {
                 :
               </span>
               <Select value={value.time.slice(3, 5)} onValueChange={(m) => void save({ ...value, time: `${value.time.slice(0, 2)}:${m}` })}>
-                <SelectTrigger aria-label="Phút" className="num w-[76px]">
+                <SelectTrigger aria-label={msg().reminder.minute} className="num w-[76px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -152,24 +151,24 @@ function ReminderSection({ initial }: { initial: ReminderSettings }) {
               </Select>
             </div>
             <p id="reminder-time-help" className="text-xs text-muted-foreground">
-              Mặc định {settingsService.DEFAULT_REMINDER_TIME}, theo múi giờ của bạn.
+              {msg().reminder.defaultTime(settingsService.DEFAULT_REMINDER_TIME)}
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            <span className="text-[13px] font-medium">Kênh nhận</span>
+            <span className="text-[13px] font-medium">{msg().reminder.channels}</span>
             <div className="flex items-center gap-2">
               <Checkbox id="ch-app" checked disabled aria-describedby="ch-app-help" />
               <Label htmlFor="ch-app" className="text-sm font-normal">
-                Thông báo trong app
+                {msg().reminder.inApp}
               </Label>
               <span id="ch-app-help" className="text-xs text-muted-foreground">
-                (luôn bật khi nhắc nhở bật)
+                {msg().reminder.alwaysOn}
               </span>
             </div>
             <div className="flex items-center gap-2">
               <Checkbox id="ch-email" checked={value.email} onCheckedChange={(c) => void save({ ...value, email: c === true })} />
               <Label htmlFor="ch-email" className="text-sm font-normal">
-                Email
+                {msg().reminder.email}
               </Label>
             </div>
           </div>
@@ -177,11 +176,11 @@ function ReminderSection({ initial }: { initial: ReminderSettings }) {
 
         <div className="flex flex-wrap items-center gap-2 border-t pt-4">
           <Button variant="outline" size="sm" disabled={!value.enabled} onClick={() => void sendTest()}>
-            Gửi thử một nhắc nhở
+            {msg().reminder.sendTest}
           </Button>
           {!value.enabled && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <BellOff aria-hidden className="size-3.5" /> Bật nhắc nhở để gửi thử
+              <BellOff aria-hidden className="size-3.5" /> {msg().reminder.enableToTest}
             </span>
           )}
         </div>
@@ -220,9 +219,9 @@ function DataSection() {
       const data = await settingsService.exportAllData();
       if (kind === "json") download(`so-tien-du-lieu-${today}.json`, JSON.stringify(data, null, 2), "application/json");
       else download(`so-tien-giao-dich-${today}.csv`, settingsService.transactionsToCsv(data), "text/csv;charset=utf-8");
-      toast.success(kind === "json" ? "Đã tải toàn bộ dữ liệu (JSON)" : `Đã tải ${data.transactions.length} giao dịch (CSV)`);
+      toast.success(kind === "json" ? msg().data.exportedJson : msg().data.exportedCsv(data.transactions.length));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không xuất được dữ liệu");
+      toast.error(e instanceof Error ? te(e.message) : msg().data.exportFailed);
     } finally {
       setExporting(null);
     }
@@ -237,10 +236,10 @@ function DataSection() {
       await settingsService.deleteAllData(phrase);
       setOpen(false);
       setPhrase("");
-      toast.success("Đã xoá toàn bộ dữ liệu", { description: "Tài khoản vẫn còn, bạn bắt đầu lại với sổ trống." });
+      toast.success(msg().data.deleted, { description: msg().data.deletedHint });
       router.push("/");
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : "Không xoá được. Thử lại nhé.");
+      setDeleteError(e instanceof Error ? te(e.message) : msg().data.deleteFailed);
     } finally {
       setDeleting(false);
     }
@@ -249,35 +248,34 @@ function DataSection() {
   const c = counts.data;
 
   return (
-    <Panel id="du-lieu" title="Dữ liệu của bạn" description="Dữ liệu là của bạn: tải về bất cứ lúc nào, hoặc xoá hẳn." className="scroll-mt-24">
+    <Panel id="du-lieu" title={msg().data.title} description={msg().data.intro} className="scroll-mt-24">
       <div className="flex flex-col gap-5">
         <div>
-          <h3 className="text-sm font-semibold">Xuất dữ liệu</h3>
+          <h3 className="text-sm font-semibold">{msg().data.exportTitle}</h3>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
-            JSON chứa mọi thứ (hồ sơ, ví, giao dịch, ngân sách, luật phân loại, thành tích). CSV chỉ gồm giao dịch, mở được bằng Excel.
+            {msg().data.exportText}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="outline" disabled={!!exporting} onClick={() => void doExport("json")}>
               {exporting === "json" ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <FileJson aria-hidden />}
-              Tải toàn bộ (JSON)
+              {msg().data.exportJson}
             </Button>
             <Button variant="outline" disabled={!!exporting} onClick={() => void doExport("csv")}>
               {exporting === "csv" ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <FileSpreadsheet aria-hidden />}
-              Tải giao dịch (CSV)
+              {msg().data.exportCsv}
             </Button>
           </div>
         </div>
 
         <div className="rounded-lg border border-danger/40 p-4">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-            <TriangleAlert aria-hidden className="size-4 text-danger" /> Xoá toàn bộ dữ liệu
+            <TriangleAlert aria-hidden className="size-4 text-danger" /> {msg().data.deleteTitle}
           </h3>
           <p className="mt-1 text-[13px] text-muted-foreground">
-            Xoá mọi giao dịch, ví, ngân sách, luật phân loại, lịch sử trợ lý AI, chuỗi ngày, XP và huy hiệu. Tài khoản vẫn giữ để bạn dùng lại từ đầu.
-            Không hoàn tác được.
+            {msg().data.deleteText}
           </p>
           <Button variant="destructive" className="mt-3" onClick={() => setOpen(true)}>
-            <Trash2 aria-hidden /> Xoá toàn bộ dữ liệu…
+            <Trash2 aria-hidden /> {msg().data.deleteButton}
           </Button>
         </div>
       </div>
@@ -295,38 +293,38 @@ function DataSection() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xoá toàn bộ dữ liệu?</AlertDialogTitle>
+            <AlertDialogTitle>{msg().data.confirmTitle}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-                <p>Những thứ sau sẽ bị xoá vĩnh viễn:</p>
+                <p>{msg().data.willDelete}</p>
                 <ul className="list-disc pl-5 text-foreground">
                   {c ? (
                     <>
                       <li>
-                        <span className="num">{c.transactions}</span> giao dịch, <span className="num">{c.wallets}</span> ví, <span className="num">{c.budgets}</span> ngân sách
+                        <span className="num">{msg().data.counts(c.transactions, c.wallets, c.budgets)}</span>
                       </li>
                       <li>
-                        <span className="num">{c.rules}</span> luật phân loại và lịch sử trợ lý AI
+                        <span className="num">{msg().data.rules(c.rules)}</span>
                       </li>
-                      <li>Chuỗi ngày, XP, cấp độ và huy hiệu</li>
+                      <li>{msg().data.gamification}</li>
                     </>
                   ) : (
-                    <li>Toàn bộ giao dịch, ví, ngân sách, thành tích</li>
+                    <li>{msg().data.everything}</li>
                   )}
                 </ul>
-                <p>Nên tải bản sao trước khi xoá.</p>
+                <p>{msg().data.backupFirst}</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <Button variant="outline" size="sm" className="w-fit" disabled={!!exporting} onClick={() => void doExport("json")}>
-            <Download aria-hidden /> Tải bản sao (JSON) trước
+            <Download aria-hidden /> {msg().data.backup}
           </Button>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="delete-phrase" className="text-[13px] font-medium">
               <span>
-                Gõ <span className="font-semibold text-foreground">{settingsService.DELETE_PHRASE}</span> để xác nhận
+                {msg().data.typeBefore} <span className="font-semibold text-foreground">{settingsService.DELETE_PHRASE}</span> {msg().data.typeAfter}
               </span>
             </Label>
             <Input
@@ -344,10 +342,10 @@ function DataSection() {
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Giữ dữ liệu</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{msg().data.keep}</AlertDialogCancel>
             <Button disabled={!phraseOk || deleting} onClick={() => void doDelete()} className="bg-danger text-white hover:bg-danger/90">
               {deleting ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <Trash2 aria-hidden />}
-              {deleting ? "Đang xoá…" : "Xoá vĩnh viễn"}
+              {deleting ? msg().data.deleting : msg().data.deleteForever}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -370,30 +368,30 @@ export function SettingsPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Cài đặt" description="Tài khoản, nhắc nhở và dữ liệu của bạn" />
+      <PageHeader title={msg().title} description={msg().intro} />
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12 xl:gap-6">
-        <nav aria-label="Mục cài đặt" className="xl:sticky xl:top-24 xl:col-span-3">
+        <nav aria-label={msg().navLabel} className="xl:sticky xl:top-24 xl:col-span-3">
           <ul className="flex gap-1 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0">
-            {SECTIONS.map((x) => (
-              <li key={x.id} className="shrink-0">
+            {SECTION_IDS.map((id) => (
+              <li key={id} className="shrink-0">
                 <a
-                  href={`#${x.id}`}
+                  href={`#${id}`}
                   className="flex h-9 items-center rounded-lg px-3 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors duration-150 hover:bg-row-hover hover:text-foreground max-md:h-11"
                 >
-                  {x.label}
+                  {msg().sections[id]}
                 </a>
               </li>
             ))}
           </ul>
           <Button variant="ghost" onClick={() => void logout()} className="mt-2 w-full justify-start text-muted-foreground max-xl:hidden">
-            <LogOut aria-hidden /> Đăng xuất
+            <LogOut aria-hidden /> {msg().logout}
           </Button>
         </nav>
 
         <div className="flex min-w-0 flex-col gap-5 xl:col-span-9 xl:max-w-[880px] xl:gap-6">
           {settings.error ? (
             <Panel>
-              <ErrorState title="Không tải được cài đặt" error={settings.error} onRetry={settings.refetch} />
+              <ErrorState title={msg().loadFailed} error={settings.error} onRetry={settings.refetch} />
             </Panel>
           ) : !s ? (
             Array.from({ length: 3 }, (_, i) => (
@@ -409,11 +407,12 @@ export function SettingsPage() {
             <>
               <ProfileSection settings={s} />
               <PasswordSection />
+              <LanguageSection />
               <PreferencesSection settings={s} />
               <ReminderSection initial={s.reminder} />
               <DataSection />
               <Button variant="outline" onClick={() => void logout()} className="w-full xl:hidden">
-                <LogOut aria-hidden /> Đăng xuất
+                <LogOut aria-hidden /> {msg().logout}
               </Button>
             </>
           )}

@@ -28,6 +28,12 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { chatService } from "@/services";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { assistantMessages } from "@/i18n/messages/assistant";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(assistantMessages);
 
 type Pending = { question: string; status: "sending" | "error" | "timeout"; error?: string };
 
@@ -50,7 +56,7 @@ function ToolCalls({ calls }: { calls: ChatToolCall[] }) {
         <p key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
           <Wrench aria-hidden className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            Đã gọi công cụ{" "}
+            {msg().toolCalled}{" "}
             <code className="rounded bg-muted px-1 py-0.5 text-[11px] break-all text-foreground">
               {c.name}({formatArgs(c)})
             </code>
@@ -82,10 +88,10 @@ function AssistantBubble({
           selected && "border-primary ring-1 ring-primary",
         )}
       >
-        <p className="sr-only">Trợ lý:</p>
+        <p className="sr-only">{msg().assistant}</p>
         {m.refused && (
           <p className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Info aria-hidden className="size-3.5" /> Ngoài phạm vi hỗ trợ
+            <Info aria-hidden className="size-3.5" /> {msg().outOfScope}
           </p>
         )}
         <p className="text-[15px] leading-6 whitespace-pre-line">{m.content}</p>
@@ -99,7 +105,7 @@ function AssistantBubble({
               onClick={onSelect}
               className="-ml-2 text-primary max-md:h-11"
             >
-              <Database aria-hidden /> Xem <span className="num">{m.sourceIds.length}</span> giao dịch nguồn
+              <Database aria-hidden /> {msg().viewSources} <span className="num">{m.sourceIds.length}</span> {msg().sourceTx}
             </Button>
           ) : (
             <span />
@@ -117,7 +123,7 @@ function UserBubble({ text, time, failed }: { text: string; time?: string; faile
   return (
     <li className="flex justify-end">
       <div className={cn("max-w-[80%] rounded-2xl rounded-tr-md bg-accent px-4 py-2.5 text-accent-foreground", failed && "opacity-80")}>
-        <p className="sr-only">Bạn:</p>
+        <p className="sr-only">{msg().you}</p>
         <p className="text-[15px] leading-6 whitespace-pre-line text-foreground">{text}</p>
         {time && (
           <time className="num mt-0.5 block text-right text-[11px] text-muted-foreground" dateTime={time}>
@@ -140,15 +146,15 @@ function SourcesPanel({ message, question }: { message: ChatMessageView | null; 
     <section aria-labelledby="sources-title" className="flex min-h-0 flex-col rounded-xl border bg-card xl:h-full">
       <header className="border-b px-4 py-4 md:px-5">
         <h2 id="sources-title" className="flex items-center gap-2 text-lg leading-[26px] font-semibold">
-          <Database aria-hidden className="size-5 text-muted-foreground" /> Giao dịch nguồn
+          <Database aria-hidden className="size-5 text-muted-foreground" /> {msg().sources}
         </h2>
         <p className="mt-0.5 text-[13px] text-muted-foreground">
           {message && question ? (
             <>
-              Căn cứ cho câu trả lời: <span className="text-foreground">“{question}”</span>
+              {msg().basis} <span className="text-foreground">“{question}”</span>
             </>
           ) : (
-            "Các giao dịch mà trợ lý dùng để tính số liệu."
+            msg().sourcesHint
           )}
         </p>
       </header>
@@ -156,11 +162,11 @@ function SourcesPanel({ message, question }: { message: ChatMessageView | null; 
       {!message ? (
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center text-sm text-muted-foreground">
           <Database aria-hidden className="mb-3 size-8 opacity-50" />
-          Chọn “Xem giao dịch nguồn” ở một câu trả lời để kiểm tra con số đến từ đâu.
+          {msg().pickAnswer}
         </div>
       ) : ids.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center text-sm text-muted-foreground">
-          Câu trả lời này không dựa trên giao dịch cụ thể nào.
+          {msg().noSources}
         </div>
       ) : query.loading ? (
         <div aria-hidden className="flex flex-col gap-3 p-5">
@@ -172,20 +178,20 @@ function SourcesPanel({ message, question }: { message: ChatMessageView | null; 
         <>
           <div className="flex flex-wrap gap-x-4 gap-y-1 border-b bg-surface-subtle px-4 py-2 text-[13px] md:px-5">
             <span className="text-muted-foreground">
-              <span className="num">{rows.length}</span> giao dịch
+              <span className="num">{rows.length}</span> {msg().transactions}
             </span>
             {income > 0 && (
               <span>
-                Thu <Money amount={income} type="income" className="font-semibold" />
+                {getMessages(commonMessages).income} <Money amount={income} type="income" className="font-semibold" />
               </span>
             )}
             {expense > 0 && (
               <span>
-                Chi <Money amount={expense} type="expense" className="font-semibold" />
+                {getMessages(commonMessages).expense} <Money amount={expense} type="expense" className="font-semibold" />
               </span>
             )}
           </div>
-          <ul aria-label="Danh sách giao dịch nguồn" className="min-h-0 flex-1 overflow-y-auto">
+          <ul aria-label={msg().sourcesList} className="min-h-0 flex-1 overflow-y-auto">
             {rows.map((t) => (
               <li key={t.id} className="border-b last:border-0">
                 <Link
@@ -277,7 +283,7 @@ export function AssistantPage() {
       setPending({
         question: q,
         status: timeout ? "timeout" : "error",
-        error: e instanceof Error ? e.message : "Trợ lý chưa trả lời được, bạn thử lại nhé.",
+        error: e instanceof Error ? te(e.message) : msg().failed,
       });
     }
   };
@@ -304,21 +310,21 @@ export function AssistantPage() {
           <header className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-4 md:px-5">
             <div className="min-w-0">
               <h1 id="chat-title" className="flex items-center gap-2 text-xl leading-7 font-bold">
-                <Bot aria-hidden className="size-6 text-primary" /> Trợ lý AI
+                <Bot aria-hidden className="size-6 text-primary" /> {msg().title}
               </h1>
               <p className="mt-0.5 text-[13px] text-muted-foreground">
-                Hỏi về thu chi của bạn. Số liệu do hệ thống tính trực tiếp từ giao dịch, AI chỉ diễn giải.
+                {msg().intro}
               </p>
             </div>
             <div className="flex gap-2">
               <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" size="sm" className="max-md:h-11" disabled={!list.data}>
-                    <History aria-hidden /> Lịch sử
+                    <History aria-hidden /> {msg().history}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-80 rounded-xl p-1.5">
-                  <p className="px-2.5 pt-1.5 pb-2 text-[13px] font-medium text-muted-foreground">Cuộc trò chuyện trước</p>
+                  <p className="px-2.5 pt-1.5 pb-2 text-[13px] font-medium text-muted-foreground">{msg().previous}</p>
                   {list.data?.length ? (
                     <ul className="flex max-h-80 flex-col overflow-y-auto">
                       {list.data.map((c) => (
@@ -334,26 +340,26 @@ export function AssistantPage() {
                           >
                             <span className="w-full truncate text-sm font-medium">{c.title}</span>
                             <span className="text-xs text-muted-foreground">
-                              <span className="num">{formatDate(c.updatedAt.slice(0, 10))}</span> · <span className="num">{c.questionCount}</span> câu hỏi
+                              <span className="num">{formatDate(c.updatedAt.slice(0, 10))}</span> · <span className="num">{c.questionCount}</span> {msg().questions}
                             </span>
                           </button>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="px-2.5 pb-2 text-sm text-muted-foreground">Chưa có cuộc trò chuyện nào.</p>
+                    <p className="px-2.5 pb-2 text-sm text-muted-foreground">{msg().noHistory}</p>
                   )}
                 </PopoverContent>
               </Popover>
               <Button variant="outline" size="sm" onClick={newChat} className="max-md:h-11">
-                <SquarePen aria-hidden /> Trò chuyện mới
+                <SquarePen aria-hidden /> {msg().newChat}
               </Button>
             </div>
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-5">
             {list.error && !list.data ? (
-              <ErrorState title="Không tải được lịch sử trò chuyện" error={list.error} onRetry={list.refetch} />
+              <ErrorState title={msg().historyFailed} error={list.error} onRetry={list.refetch} />
             ) : list.loading || loadingConversation ? (
               <div aria-hidden className="flex flex-col gap-4">
                 <Skeleton className="ml-auto h-10 w-2/3 rounded-2xl" />
@@ -366,9 +372,9 @@ export function AssistantPage() {
                 <span aria-hidden className="mb-3 inline-flex size-12 items-center justify-center rounded-full bg-accent text-primary">
                   <Bot className="size-6" />
                 </span>
-                <p className="text-[15px] font-semibold">Bạn muốn biết gì về chi tiêu của mình?</p>
-                <p className="mt-1 max-w-sm text-sm text-muted-foreground">Chọn một câu hỏi mẫu hoặc tự gõ câu hỏi bên dưới.</p>
-                <ul className="mt-4 flex max-w-lg flex-wrap justify-center gap-2" aria-label="Câu hỏi gợi ý">
+                <p className="text-[15px] font-semibold">{msg().emptyTitle}</p>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">{msg().emptyText}</p>
+                <ul className="mt-4 flex max-w-lg flex-wrap justify-center gap-2" aria-label={msg().suggestions}>
                   {chatService.SUGGESTED_QUESTIONS.map((q) => (
                     <li key={q}>
                       <button
@@ -383,7 +389,7 @@ export function AssistantPage() {
                 </ul>
               </div>
             ) : (
-              <ol ref={logRef} role="log" aria-label="Hội thoại với trợ lý" aria-live="polite" className="flex flex-col gap-4">
+              <ol ref={logRef} role="log" aria-label={msg().log} aria-live="polite" className="flex flex-col gap-4">
                 {messages.map((m) =>
                   m.role === "user" ? (
                     <UserBubble key={m.id} text={m.content} time={m.createdAt} />
@@ -404,7 +410,7 @@ export function AssistantPage() {
                     </span>
                     <div className="flex items-center gap-2 rounded-2xl rounded-tl-md border bg-card px-4 py-3 text-sm text-muted-foreground">
                       <Loader2 aria-hidden className="size-4 animate-spin" />
-                      Đang tra cứu dữ liệu của bạn…
+                      {msg().thinking}
                     </div>
                   </li>
                 )}
@@ -415,12 +421,12 @@ export function AssistantPage() {
                     </span>
                     <div role="alert" className="max-w-[85%] rounded-2xl rounded-tl-md border border-danger/30 bg-card px-4 py-3">
                       <p className="text-sm font-medium">
-                        {pending.status === "timeout" ? "Trợ lý trả lời quá lâu" : "Trợ lý chưa trả lời được"}
+                        {pending.status === "timeout" ? msg().tooSlow : msg().notAnswered}
                       </p>
                       <p className="mt-0.5 text-sm text-muted-foreground">{pending.error}</p>
                       <div className="mt-2.5 flex gap-2">
                         <Button size="sm" onClick={() => send(pending.question)} className="max-md:h-11">
-                          <RotateCw aria-hidden /> Thử lại
+                          <RotateCw aria-hidden /> {msg().retry}
                         </Button>
                         <Button
                           size="sm"
@@ -432,7 +438,7 @@ export function AssistantPage() {
                           }}
                           className="max-md:h-11"
                         >
-                          <X aria-hidden /> Sửa câu hỏi
+                          <X aria-hidden /> {msg().editQuestion}
                         </Button>
                       </div>
                     </div>
@@ -450,7 +456,7 @@ export function AssistantPage() {
             className="border-t px-4 py-3 md:px-5"
           >
             <label htmlFor="chat-input" className="sr-only">
-              Câu hỏi cho trợ lý
+              {msg().inputLabel}
             </label>
             <div className="flex items-end gap-2">
               <textarea
@@ -470,17 +476,17 @@ export function AssistantPage() {
                     send(input);
                   }
                 }}
-                placeholder="Ví dụ: Tháng này tiêu ăn uống bao nhiêu?"
+                placeholder={msg().placeholder}
                 disabled={sending}
                 aria-describedby="chat-hint"
                 className="min-h-11 flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-base leading-6 outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring disabled:opacity-60 md:text-sm"
               />
-              <Button type="submit" size="icon-lg" disabled={sending || !input.trim()} aria-label="Gửi câu hỏi" className="size-11">
+              <Button type="submit" size="icon-lg" disabled={sending || !input.trim()} aria-label={msg().send} className="size-11">
                 {sending ? <Loader2 aria-hidden className="animate-spin" /> : <SendHorizontal aria-hidden />}
               </Button>
             </div>
             <p id="chat-hint" className="mt-1.5 flex justify-between gap-2 text-xs text-muted-foreground">
-              <span>Enter để gửi · Shift + Enter xuống dòng</span>
+              <span>{msg().hint}</span>
               {input.length > chatService.QUESTION_MAX_LENGTH - 50 && (
                 <span className="num">
                   {input.length}/{chatService.QUESTION_MAX_LENGTH}

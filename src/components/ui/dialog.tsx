@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { cn } from "cn"
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
@@ -76,7 +78,7 @@ function DialogContent({
             >
               <XIcon
               />
-              <span className="sr-only">Đóng</span>
+              <span className="sr-only">{getMessages(commonMessages).close}</span>
             </Button>
           </DialogPrimitive.Close>
         )}
@@ -115,7 +117,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Đóng</Button>
+          <Button variant="outline">{getMessages(commonMessages).close}</Button>
         </DialogPrimitive.Close>
       )}
     </div>

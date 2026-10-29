@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Be_Vietnam_Pro, Inter } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { I18nProvider } from "@/i18n/provider";
 import "./globals.css";
 
 // Chữ: Be Vietnam Pro (dấu tiếng Việt cân đối)
@@ -32,8 +33,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="vi" className={`${beVietnam.variable} ${inter.variable}`}>
       <body className="min-h-svh">
-        <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
-        <Toaster theme="light" position="bottom-right" />
+        <I18nProvider>
+          <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
+          <Toaster theme="light" position="bottom-right" />
+        </I18nProvider>
       </body>
     </html>
   );

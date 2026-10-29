@@ -9,11 +9,16 @@ import { Input } from "@/components/ui/input";
 import { FormAlert, FormField, PasswordInput } from "@/components/form-field";
 import { useSession } from "@/hooks/use-session";
 import { authService } from "@/services";
+import { useT } from "@/i18n/provider";
+import { authMessages } from "@/i18n/messages/auth";
+import { te } from "@/i18n/errors";
 
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const session = useSession();
+  const t = useT(authMessages);
+  const tl = t.login;
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [errors, setErrors] = React.useState<{ email?: string; password?: string }>({});
@@ -33,7 +38,7 @@ export function LoginForm() {
     e.preventDefault();
     const next = {
       email: authService.validateEmail(email) ?? undefined,
-      password: password ? undefined : "Nhập mật khẩu",
+      password: password ? undefined : tl.enterPassword,
     };
     setErrors(next);
     setFormError(null);
@@ -46,7 +51,7 @@ export function LoginForm() {
       // Next giữ trang đã rời (ẩn) để quay lại nhanh → xoá mật khẩu và trạng thái chờ
       setPassword("");
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Không đăng nhập được. Thử lại nhé.");
+      setFormError(err instanceof Error ? te(err.message) : tl.failed);
       passwordRef.current?.select();
     } finally {
       setPending(false);
@@ -63,14 +68,14 @@ export function LoginForm() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl leading-8 font-bold">Đăng nhập</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Chào mừng bạn quay lại. Ghi một khoản hôm nay để giữ chuỗi nhé!</p>
+        <h1 className="text-2xl leading-8 font-bold">{tl.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{tl.subtitle}</p>
       </div>
 
-      {reason === "het-phien" && <FormAlert tone="info">Bạn cần đăng nhập để tiếp tục.</FormAlert>}
+      {reason === "het-phien" && <FormAlert tone="info">{tl.sessionExpired}</FormAlert>}
 
       <form noValidate onSubmit={submit} className="flex flex-col gap-4">
-        <FormField label="Email" error={errors.email}>
+        <FormField label={t.email} error={errors.email}>
           {(p) => (
             <Input
               {...p}
@@ -81,16 +86,16 @@ export function LoginForm() {
               autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="ten@example.com"
+              placeholder={t.emailPlaceholder}
             />
           )}
         </FormField>
         <FormField
-          label="Mật khẩu"
+          label={t.password}
           error={errors.password}
           action={
             <Link href="/quen-mat-khau" className="text-[13px] font-medium text-primary underline-offset-4 hover:underline">
-              Quên mật khẩu?
+              {tl.forgot}
             </Link>
           }
         >
@@ -103,20 +108,20 @@ export function LoginForm() {
 
         <Button type="submit" disabled={pending} className="h-11 w-full md:h-10">
           {pending ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <LogIn aria-hidden />}
-          {pending ? "Đang đăng nhập…" : "Đăng nhập"}
+          {pending ? tl.submitting : tl.submit}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
-        Chưa có tài khoản?{" "}
+        {tl.noAccount}{" "}
         <Link href="/dang-ky" className="font-medium text-primary underline-offset-4 hover:underline">
-          Đăng ký miễn phí
+          {tl.registerLink}
         </Link>
       </p>
 
       <section aria-labelledby="demo-accounts" className="rounded-xl border border-dashed bg-card p-4">
         <h2 id="demo-accounts" className="text-[13px] font-semibold">
-          Tài khoản dùng thử
+          {tl.demoTitle}
         </h2>
         <ul className="mt-2 flex flex-col divide-y">
           {authService.DEMO_ACCOUNTS.map((a) => (
@@ -128,7 +133,7 @@ export function LoginForm() {
                 </p>
               </div>
               <Button type="button" size="sm" variant="outline" onClick={() => fill(a)} className="max-md:h-11">
-                Điền sẵn
+                {tl.fill}
               </Button>
             </li>
           ))}

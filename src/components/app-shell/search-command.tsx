@@ -17,15 +17,18 @@ import { Button } from "@/components/ui/button";
 import { CategoryIcon } from "@/components/category-icon";
 import { Money } from "@/components/money";
 import { transactionService } from "@/services";
-import { NAV_MAIN, NAV_SECONDARY } from "@/lib/nav";
+import { NAV_MAIN, NAV_SECONDARY, navSearchText } from "@/lib/nav";
 import { formatDate } from "@/lib/format";
 import { normalize } from "@/lib/text";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/provider";
+import { shellMessages } from "@/i18n/messages/shell";
 
 const PAGES = [...NAV_MAIN, ...NAV_SECONDARY];
 
 export function SearchCommand({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const router = useRouter();
+  const t = useT(shellMessages).search;
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<TransactionView[]>([]);
   const [searching, setSearching] = React.useState(false);
@@ -55,7 +58,7 @@ export function SearchCommand({ open, onOpenChange }: { open: boolean; onOpenCha
   }, [query]);
 
   const q = normalize(query.trim());
-  const pages = q ? PAGES.filter((p) => normalize(`${p.label} ${p.keywords ?? ""}`).includes(q)) : PAGES;
+  const pages = q ? PAGES.filter((p) => normalize(navSearchText(p)).includes(q)) : PAGES;
 
   const go = (href: string) => {
     onOpenChange(false);
@@ -70,19 +73,19 @@ export function SearchCommand({ open, onOpenChange }: { open: boolean; onOpenCha
         onOpenChange(o);
         if (!o) changeQuery("");
       }}
-      title="Tìm kiếm"
-      description="Tìm trang hoặc giao dịch theo mô tả, danh mục, ví"
+      title={t.title}
+      description={t.description}
       className="sm:max-w-xl"
     >
       {/* Tự lọc (kết quả giao dịch đến từ service) nên tắt bộ lọc của cmdk */}
       <Command shouldFilter={false}>
-        <CommandInput placeholder="Tìm trang, giao dịch… (vd: phở, Grab, MoMo)" value={query} onValueChange={changeQuery} />
+        <CommandInput placeholder={t.placeholder} value={query} onValueChange={changeQuery} />
         <CommandList className="max-h-[min(420px,60svh)]">
           {!searching && pages.length === 0 && results.length === 0 && (
-            <CommandEmpty>Không tìm thấy kết quả cho “{query}”.</CommandEmpty>
+            <CommandEmpty>{t.empty(query)}</CommandEmpty>
           )}
           {pages.length > 0 && (
-            <CommandGroup heading="Trang">
+            <CommandGroup heading={t.pages}>
               {pages.map((p) => (
                 <CommandItem key={p.href} value={`page:${p.href}`} onSelect={() => go(p.href)}>
                   <p.icon aria-hidden />
@@ -93,11 +96,11 @@ export function SearchCommand({ open, onOpenChange }: { open: boolean; onOpenCha
           )}
           {searching && (
             <div role="status" className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
-              <Loader2 aria-hidden className="size-4 animate-spin" /> Đang tìm giao dịch…
+              <Loader2 aria-hidden className="size-4 animate-spin" /> {t.searching}
             </div>
           )}
           {!searching && results.length > 0 && (
-            <CommandGroup heading="Giao dịch">
+            <CommandGroup heading={t.transactions}>
               {results.map((t) => (
                 <CommandItem key={t.id} value={`tx:${t.id}`} onSelect={() => go(`/giao-dich?id=${t.id}`)} className="gap-3">
                   <CategoryIcon icon={t.category.icon} color={t.category.color} size="sm" />
@@ -120,16 +123,17 @@ export function SearchCommand({ open, onOpenChange }: { open: boolean; onOpenCha
 
 /** Nút mở tìm kiếm trên thanh trên */
 export function SearchButton({ onClick, className }: { onClick: () => void; className?: string }) {
+  const t = useT(shellMessages).search;
   return (
     <Button
       variant="outline"
       onClick={onClick}
-      aria-label="Tìm kiếm (Ctrl K)"
+      aria-label={t.button}
       aria-keyshortcuts="Control+K /"
       className={cn("h-10 gap-2 text-muted-foreground max-xl:w-10 max-xl:px-0 max-md:size-11", className)}
     >
       <Search aria-hidden />
-      <span className="hidden xl:inline">Tìm kiếm</span>
+      <span className="hidden xl:inline">{t.title}</span>
       <kbd aria-hidden className="num ml-2 hidden rounded border bg-muted px-1.5 py-0.5 text-[11px] font-medium xl:inline">
         Ctrl K
       </kbd>

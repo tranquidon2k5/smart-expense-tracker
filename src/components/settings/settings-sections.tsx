@@ -13,6 +13,12 @@ import { FormAlert, FormField, PasswordChecklist, PasswordInput } from "@/compon
 import { Panel } from "@/components/panel";
 import { authService, settingsService } from "@/services";
 import { formatDate } from "@/lib/format";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { getMessages } from "@/i18n/core";
+import { settingsMessages } from "@/i18n/messages/settings";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(settingsMessages);
 
 /** Nút lưu: chỉ bật khi có thay đổi; hiện trạng thái đang lưu */
 export function SaveBar({ dirty, saving, onReset }: { dirty: boolean; saving: boolean; onReset?: () => void }) {
@@ -20,12 +26,12 @@ export function SaveBar({ dirty, saving, onReset }: { dirty: boolean; saving: bo
     <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t pt-4">
       {dirty && onReset && (
         <Button type="button" variant="ghost" onClick={onReset} disabled={saving}>
-          Huỷ thay đổi
+          {msg().discard}
         </Button>
       )}
       <Button type="submit" disabled={!dirty || saving}>
         {saving ? <Loader2 aria-hidden className="motion-safe:animate-spin" /> : <Check aria-hidden />}
-        {saving ? "Đang lưu…" : "Lưu thay đổi"}
+        {saving ? msg().saving : msg().saveChanges}
       </Button>
     </div>
   );
@@ -46,17 +52,17 @@ export function ProfileSection({ settings }: { settings: UserSettings }) {
     setErrors({});
     try {
       await settingsService.updateProfile(values);
-      toast.success("Đã lưu hồ sơ");
+      toast.success(msg().profile.saved);
     } catch (err) {
       const field = err instanceof authService.AuthError && (err.field === "email" || err.field === "fullName") ? err.field : "fullName";
-      setErrors({ [field]: err instanceof Error ? err.message : "Không lưu được" });
+      setErrors({ [field]: err instanceof Error ? te(err.message) : msg().saveFailed });
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Panel id="ho-so" title="Hồ sơ" description="Tên dùng trong lời chào và câu khích lệ; email dùng để đăng nhập." className="scroll-mt-24">
+    <Panel id="ho-so" title={msg().profile.title} description={msg().profile.intro} className="scroll-mt-24">
       <form noValidate onSubmit={submit}>
         <div className="flex flex-col gap-5 md:flex-row md:items-start">
           <div className="flex items-center gap-3 md:w-40 md:flex-col md:items-start">
@@ -64,11 +70,11 @@ export function ProfileSection({ settings }: { settings: UserSettings }) {
               <AvatarFallback className="bg-accent text-xl font-semibold text-accent-foreground">{initialsOf(values.fullName || "?")}</AvatarFallback>
             </Avatar>
             <p className="text-xs text-muted-foreground">
-              Tham gia từ <span className="num">{formatDate(settings.profile.createdAt.slice(0, 10))}</span>
+              {msg().profile.joined} <span className="num">{formatDate(settings.profile.createdAt.slice(0, 10))}</span>
             </p>
           </div>
           <div className="grid flex-1 gap-4 sm:grid-cols-2">
-            <FormField label="Họ và tên" error={errors.fullName}>
+            <FormField label={msg().profile.fullName} error={errors.fullName}>
               {(p) => <Input {...p} autoComplete="name" value={values.fullName} onChange={(e) => setValues((v) => ({ ...v, fullName: e.target.value }))} />}
             </FormField>
             <FormField label="Email" error={errors.email}>
@@ -95,9 +101,9 @@ export function PasswordSection() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const next = {
-      current: values.current ? undefined : "Nhập mật khẩu hiện tại",
+      current: values.current ? undefined : msg().password.currentRequired,
       next: authService.validatePassword(values.next) ?? undefined,
-      confirm: values.confirm !== values.next ? "Hai mật khẩu chưa giống nhau" : undefined,
+      confirm: values.confirm !== values.next ? msg().password.mismatch : undefined,
     };
     setErrors(next);
     if (next.current || next.next || next.confirm) return;
@@ -105,25 +111,25 @@ export function PasswordSection() {
     try {
       await authService.changePassword(values.current, values.next);
       setValues(empty);
-      toast.success("Đã đổi mật khẩu", { description: "Lần đăng nhập sau dùng mật khẩu mới nhé." });
+      toast.success(msg().password.changed, { description: msg().password.changedHint });
     } catch (err) {
       const field = err instanceof authService.AuthError && err.field === "currentPassword" ? "current" : "next";
-      setErrors({ [field]: err instanceof Error ? err.message : "Không đổi được mật khẩu" });
+      setErrors({ [field]: err instanceof Error ? te(err.message) : msg().password.failed });
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Panel id="mat-khau" title="Đổi mật khẩu" className="scroll-mt-24">
+    <Panel id="mat-khau" title={msg().password.title} className="scroll-mt-24">
       <form noValidate onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Mật khẩu hiện tại" error={errors.current} className="sm:col-span-2 sm:max-w-[calc(50%-8px)]">
+        <FormField label={msg().password.current} error={errors.current} className="sm:col-span-2 sm:max-w-[calc(50%-8px)]">
           {(p) => <PasswordInput {...p} autoComplete="current-password" value={values.current} onChange={(e) => setValues((v) => ({ ...v, current: e.target.value }))} />}
         </FormField>
-        <FormField label="Mật khẩu mới" error={errors.next} hint={<PasswordChecklist checks={authService.passwordChecks(values.next)} />}>
+        <FormField label={msg().password.next} error={errors.next} hint={<PasswordChecklist checks={authService.passwordChecks(values.next)} />}>
           {(p) => <PasswordInput {...p} autoComplete="new-password" value={values.next} onChange={(e) => setValues((v) => ({ ...v, next: e.target.value }))} />}
         </FormField>
-        <FormField label="Nhập lại mật khẩu mới" error={errors.confirm}>
+        <FormField label={msg().password.confirm} error={errors.confirm}>
           {(p) => <PasswordInput {...p} autoComplete="new-password" value={values.confirm} onChange={(e) => setValues((v) => ({ ...v, confirm: e.target.value }))} />}
         </FormField>
         <div className="sm:col-span-2">
@@ -149,19 +155,19 @@ export function PreferencesSection({ settings }: { settings: UserSettings }) {
     setError(null);
     try {
       await settingsService.updatePreferences(values);
-      toast.success("Đã lưu tuỳ chọn");
+      toast.success(msg().prefs.saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không lưu được");
+      setError(err instanceof Error ? te(err.message) : msg().saveFailed);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Panel id="tuy-chon" title="Tiền tệ và múi giờ" className="scroll-mt-24">
+    <Panel id="tuy-chon" title={msg().prefs.title} className="scroll-mt-24">
       <form noValidate onSubmit={submit}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Đơn vị tiền tệ" hint="Số tiền hiển thị dạng 45.000đ.">
+          <FormField label={msg().prefs.currency} hint={msg().prefs.currencyHint}>
             {(p) => (
               <Select value={values.currency} onValueChange={(currency) => setValues((v) => ({ ...v, currency }))}>
                 <SelectTrigger {...p} className="w-full">
@@ -170,15 +176,15 @@ export function PreferencesSection({ settings }: { settings: UserSettings }) {
                 <SelectContent>
                   {settingsService.CURRENCIES.map((c) => (
                     <SelectItem key={c.code} value={c.code} disabled={!c.available}>
-                      {c.label}
-                      {!c.available && <span className="text-muted-foreground"> · sắp có</span>}
+                      {msg().prefs.currencies[c.code] ?? c.label}
+                      {!c.available && <span className="text-muted-foreground">{msg().prefs.soon}</span>}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
           </FormField>
-          <FormField label="Múi giờ" hint="Dùng để tính “một ngày” (00:00–23:59) cho chuỗi ghi chép và giờ nhắc.">
+          <FormField label={msg().prefs.timezone} hint={msg().prefs.timezoneHint}>
             {(p) => (
               <Select value={values.timezone} onValueChange={(timezone) => setValues((v) => ({ ...v, timezone }))}>
                 <SelectTrigger {...p} className="w-full">
@@ -187,7 +193,7 @@ export function PreferencesSection({ settings }: { settings: UserSettings }) {
                 <SelectContent>
                   {settingsService.TIMEZONES.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.label}
+                      {t.id === "Asia/Ho_Chi_Minh" ? msg().prefs.vietnam : t.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -202,6 +208,23 @@ export function PreferencesSection({ settings }: { settings: UserSettings }) {
         )}
         <SaveBar dirty={dirty} saving={saving} onReset={() => setValues(initial)} />
       </form>
+    </Panel>
+  );
+}
+
+// ───────────── Ngôn ngữ ─────────────
+
+export function LanguageSection() {
+  const t = msg().language;
+  return (
+    <Panel id="ngon-ngu" title={t.title} description={t.intro} className="scroll-mt-24">
+      <div className="flex flex-col gap-2">
+        <label htmlFor="ui-language" className="text-[13px] font-medium">
+          {t.label}
+        </label>
+        <LanguageSwitcher id="ui-language" className="w-full justify-between sm:w-64" />
+        <p className="text-xs text-muted-foreground">{t.note}</p>
+      </div>
     </Panel>
   );
 }

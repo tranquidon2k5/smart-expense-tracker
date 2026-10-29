@@ -10,6 +10,8 @@ import { useSession } from "@/hooks/use-session";
 import { useServiceQuery } from "@/hooks/use-service-query";
 import { gamificationService } from "@/services";
 import { NAV_MAIN, NAV_SECONDARY } from "@/lib/nav";
+import { getMessages } from "@/i18n/core";
+import { shellMessages } from "@/i18n/messages/shell";
 import { AccountMenu } from "./account-menu";
 import { StreakPill, XpMeter } from "./gamification-status";
 import { SearchButton } from "./search-command";
@@ -19,7 +21,8 @@ function pageTitle(pathname: string) {
     n.href === "/" ? pathname === "/" : pathname.startsWith(n.href),
   );
   if (item) return item.label;
-  return pathname.startsWith("/thong-bao") ? "Thông báo" : "Sổ Tiền";
+  const t = getMessages(shellMessages);
+  return pathname.startsWith("/thong-bao") ? t.nav["/thong-bao"] : t.brand;
 }
 
 function PageTitle() {

@@ -10,14 +10,26 @@ import { AccountMenu } from "@/components/app-shell/account-menu";
 import { AuthGate } from "@/components/auth/auth-gate";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { adminMessages } from "@/i18n/messages/admin";
 
-export const ADMIN_NAV: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/quan-tri", label: "Thống kê hệ thống", icon: Activity },
-  { href: "/quan-tri/nguoi-dung", label: "Người dùng", icon: Users },
-  { href: "/quan-tri/danh-muc", label: "Danh mục mặc định", icon: Shapes },
-  { href: "/quan-tri/cau-khich-le", label: "Câu khích lệ", icon: MessageSquareQuote },
-  { href: "/quan-tri/nhiem-vu", label: "Nhiệm vụ", icon: ListChecks },
-  { href: "/quan-tri/huy-hieu", label: "Huy hiệu", icon: Award },
+const msg = () => getMessages(adminMessages);
+
+const adminItem = (href: string, icon: LucideIcon) => ({
+  href,
+  icon,
+  get label() {
+    return msg().nav[href];
+  },
+});
+
+export const ADMIN_NAV: { href: string; readonly label: string; icon: LucideIcon }[] = [
+  adminItem("/quan-tri", Activity),
+  adminItem("/quan-tri/nguoi-dung", Users),
+  adminItem("/quan-tri/danh-muc", Shapes),
+  adminItem("/quan-tri/cau-khich-le", MessageSquareQuote),
+  adminItem("/quan-tri/nhiem-vu", ListChecks),
+  adminItem("/quan-tri/huy-hieu", Award),
 ];
 
 function NavLinks({ pathname }: { pathname: string | null }) {
@@ -55,11 +67,11 @@ function Forbidden({ session }: { session: AuthSession }) {
     <div className="flex min-h-svh items-center justify-center bg-background px-4">
       <EmptyState
         icon={ShieldX}
-        title="Trang này chỉ dành cho quản trị viên"
-        description={`Tài khoản ${session.email} không có quyền quản trị. Nếu bạn cần quyền này, liên hệ quản trị viên hệ thống.`}
+        title={msg().forbiddenTitle}
+        description={msg().forbiddenText(session.email)}
         action={
           <Button asChild>
-            <Link href="/">Về trang Tổng quan</Link>
+            <Link href="/">{msg().backHome}</Link>
           </Button>
         }
       />
@@ -83,26 +95,26 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               href="#admin-main"
               className="fixed top-2 left-2 z-50 -translate-y-20 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus-visible:translate-y-0"
             >
-              Bỏ qua đến nội dung chính
+              {msg().skip}
             </a>
             <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b bg-card px-4 lg:px-5">
-              <Link href="/quan-tri" className="flex items-center gap-2 rounded-lg" aria-label="Sổ Tiền — Quản trị">
+              <Link href="/quan-tri" className="flex items-center gap-2 rounded-lg" aria-label={msg().homeLink}>
                 <span aria-hidden className="inline-flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <NotebookPen className="size-[18px]" />
                 </span>
                 <span className="font-bold tracking-tight">Sổ Tiền</span>
-                <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-semibold text-primary">Quản trị</span>
+                <span className="rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-semibold text-primary">{msg().badge}</span>
               </Link>
               <div className="flex-1" />
               <Button variant="ghost" size="sm" asChild className="text-muted-foreground max-sm:hidden">
                 <Link href="/">
-                  <ExternalLink aria-hidden /> Mở ứng dụng
+                  <ExternalLink aria-hidden /> {msg().openApp}
                 </Link>
               </Button>
               {session && <AccountMenu session={session} />}
             </header>
             <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col lg:flex-row">
-              <nav aria-label="Điều hướng quản trị" className="border-b bg-card px-3 py-2 lg:sticky lg:top-14 lg:h-[calc(100svh-3.5rem)] lg:w-[216px] lg:shrink-0 lg:border-r lg:border-b-0 lg:py-4">
+              <nav aria-label={msg().navLabel} className="border-b bg-card px-3 py-2 lg:sticky lg:top-14 lg:h-[calc(100svh-3.5rem)] lg:w-[216px] lg:shrink-0 lg:border-r lg:border-b-0 lg:py-4">
                 <React.Suspense fallback={<NavLinks pathname={null} />}>
                   <ActiveNav />
                 </React.Suspense>

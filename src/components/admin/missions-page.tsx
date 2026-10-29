@@ -17,8 +17,14 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { adminService } from "@/services";
 import { cn } from "@/lib/utils";
 import { AdminHeader } from "./admin-shell";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { adminMessages } from "@/i18n/messages/admin";
+import { te } from "@/i18n/errors";
 
-const PERIOD_LABEL: Record<MissionPeriod, string> = { daily: "Ngày", weekly: "Tuần" };
+const msg = () => getMessages(adminMessages);
+
+const periodLabel = (p: MissionPeriod) => msg().missions.periods[p];
 
 function MissionDialog({ open, onOpenChange, editing }: { open: boolean; onOpenChange: (o: boolean) => void; editing: Mission | null }) {
   const [form, setForm] = React.useState({ title: "", period: "daily" as MissionPeriod, target: "3", xp: "20", isActive: true });
@@ -52,10 +58,10 @@ function MissionDialog({ open, onOpenChange, editing }: { open: boolean; onOpenC
         xp: Number(form.xp),
         isActive: form.isActive,
       });
-      toast.success(editing ? "Đã lưu nhiệm vụ" : "Đã thêm nhiệm vụ");
+      toast.success(editing ? msg().missions.saved : msg().missions.added);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không lưu được");
+      setError(err instanceof Error ? te(err.message) : msg().saveFailed);
     } finally {
       setSaving(false);
     }
@@ -65,19 +71,19 @@ function MissionDialog({ open, onOpenChange, editing }: { open: boolean; onOpenC
     <Dialog open={open} onOpenChange={(o) => !saving && onOpenChange(o)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? "Sửa nhiệm vụ" : "Thêm nhiệm vụ"}</DialogTitle>
-          <DialogDescription>Nhiệm vụ thưởng hành vi ghi chép đều, không thưởng việc tiêu tiền (PRD §6.1). Ngày ~20 XP, tuần ~100 XP.</DialogDescription>
+          <DialogTitle>{editing ? msg().missions.editTitle : msg().missions.addTitle}</DialogTitle>
+          <DialogDescription>{msg().missions.dialogText}</DialogDescription>
         </DialogHeader>
         <form id="mission-form" noValidate onSubmit={submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="ms-title" className="text-[13px]">
-              Tên nhiệm vụ
+              {msg().missions.name}
             </Label>
-            <Input id="ms-title" autoFocus value={form.title} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Vd. Ghi ít nhất 3 giao dịch" />
+            <Input id="ms-title" autoFocus value={form.title} maxLength={60} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder={msg().missions.placeholder} />
           </div>
           <fieldset disabled={!!editing} className="flex flex-col gap-1.5">
-            <legend className="mb-1.5 text-[13px] font-medium">Chu kỳ</legend>
-            <div className="inline-flex w-fit rounded-lg border p-0.5" role="radiogroup" aria-label="Chu kỳ">
+            <legend className="mb-1.5 text-[13px] font-medium">{msg().missions.period}</legend>
+            <div className="inline-flex w-fit rounded-lg border p-0.5" role="radiogroup" aria-label={msg().missions.period}>
               {(["daily", "weekly"] as const).map((p) => (
                 <button
                   key={p}
@@ -90,22 +96,22 @@ function MissionDialog({ open, onOpenChange, editing }: { open: boolean; onOpenC
                     form.period === p ? "bg-accent text-primary" : "text-muted-foreground hover:bg-row-hover",
                   )}
                 >
-                  {PERIOD_LABEL[p]}
+                  {periodLabel(p)}
                 </button>
               ))}
             </div>
-            {editing && <p className="text-xs text-muted-foreground">Không đổi chu kỳ của nhiệm vụ đang chạy; tạo nhiệm vụ mới nếu cần.</p>}
+            {editing && <p className="text-xs text-muted-foreground">{msg().missions.periodLocked}</p>}
           </fieldset>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="ms-target" className="text-[13px]">
-                Mục tiêu (lần)
+                {msg().missions.target}
               </Label>
               <Input id="ms-target" inputMode="numeric" className="num" value={form.target} onChange={(e) => setForm((f) => ({ ...f, target: e.target.value.replace(/\D/g, "") }))} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="ms-xp" className="text-[13px]">
-                XP thưởng
+                {msg().missions.xp}
               </Label>
               <Input id="ms-xp" inputMode="numeric" className="num" value={form.xp} onChange={(e) => setForm((f) => ({ ...f, xp: e.target.value.replace(/\D/g, "") }))} />
             </div>
@@ -113,7 +119,7 @@ function MissionDialog({ open, onOpenChange, editing }: { open: boolean; onOpenC
           <div className="flex items-center gap-2">
             <Switch id="ms-active" checked={form.isActive} onCheckedChange={(v) => setForm((f) => ({ ...f, isActive: v }))} />
             <Label htmlFor="ms-active" className="text-sm font-normal">
-              Đang giao cho người dùng
+              {msg().missions.assigned}
             </Label>
           </div>
           {error && (
@@ -125,11 +131,11 @@ function MissionDialog({ open, onOpenChange, editing }: { open: boolean; onOpenC
         </form>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Huỷ
+            {getMessages(commonMessages).cancel}
           </Button>
           <Button type="submit" form="mission-form" disabled={saving}>
             {saving && <Loader2 aria-hidden className="motion-safe:animate-spin" />}
-            {editing ? "Lưu" : "Thêm nhiệm vụ"}
+            {editing ? msg().save : msg().missions.add}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -138,26 +144,26 @@ function MissionDialog({ open, onOpenChange, editing }: { open: boolean; onOpenC
 }
 
 export function MissionsPage() {
-  const list = useServiceQuery(() => adminService.listMissions());
+  const list = useServiceQuery(() => adminService.listMissions(), "", { raw: true });
   const [dialog, setDialog] = React.useState<{ open: boolean; editing: Mission | null }>({ open: false, editing: null });
 
   const toggle = async (m: Mission, isActive: boolean) => {
     try {
       await adminService.saveMission({ ...m, isActive });
-      toast.success(isActive ? `Đã bật “${m.title}”` : `Đã tắt “${m.title}”`);
+      toast.success(isActive ? msg().missions.on(m.title) : msg().missions.off(m.title));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không cập nhật được");
+      toast.error(e instanceof Error ? te(e.message) : msg().updateFailed);
     }
   };
 
   return (
     <>
       <AdminHeader
-        title="Nhiệm vụ"
-        description="Nhiệm vụ ngày làm mới lúc 00:00, nhiệm vụ tuần làm mới thứ Hai. Tắt nhiệm vụ thì người dùng không thấy nữa."
+        title={msg().missions.title}
+        description={msg().missions.intro}
         actions={
           <Button size="sm" onClick={() => setDialog({ open: true, editing: null })}>
-            <Plus aria-hidden /> Thêm nhiệm vụ
+            <Plus aria-hidden /> {msg().missions.add}
           </Button>
         }
       />
@@ -165,17 +171,17 @@ export function MissionsPage() {
         {list.error ? (
           <ErrorState error={list.error} onRetry={list.refetch} />
         ) : (
-          <Table aria-label="Danh sách nhiệm vụ">
+          <Table aria-label={msg().missions.tableLabel}>
             <TableHeader className="bg-surface-subtle">
               <TableRow className="hover:bg-transparent">
-                <TableHead>Mã</TableHead>
-                <TableHead>Nhiệm vụ</TableHead>
-                <TableHead>Chu kỳ</TableHead>
-                <TableHead className="text-right">Mục tiêu</TableHead>
+                <TableHead>{msg().code}</TableHead>
+                <TableHead>{msg().missions.mission}</TableHead>
+                <TableHead>{msg().missions.period}</TableHead>
+                <TableHead className="text-right">{msg().missions.targetShort}</TableHead>
                 <TableHead className="text-right">XP</TableHead>
-                <TableHead>Đang giao</TableHead>
+                <TableHead>{msg().missions.assignedShort}</TableHead>
                 <TableHead className="w-16 text-right">
-                  <span className="sr-only">Thao tác</span>
+                  <span className="sr-only">{getMessages(commonMessages).actions}</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -192,14 +198,14 @@ export function MissionsPage() {
                     <TableRow key={m.id} className={cn(m.isActive === false && "text-muted-foreground")}>
                       <TableCell className="font-mono text-xs">{m.code}</TableCell>
                       <TableCell className="font-medium">{m.title}</TableCell>
-                      <TableCell>{PERIOD_LABEL[m.period]}</TableCell>
+                      <TableCell>{periodLabel(m.period)}</TableCell>
                       <TableCell className="num text-right">{m.target}</TableCell>
                       <TableCell className="num text-right text-xp-text">+{m.xp}</TableCell>
                       <TableCell>
-                        <Switch checked={m.isActive !== false} onCheckedChange={(v) => void toggle(m, v)} aria-label={`Giao nhiệm vụ ${m.title}`} />
+                        <Switch checked={m.isActive !== false} onCheckedChange={(v) => void toggle(m, v)} aria-label={msg().missions.assignLabel(m.title)} />
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon-xs" variant="ghost" aria-label={`Sửa ${m.title}`} title="Sửa" onClick={() => setDialog({ open: true, editing: m })} className="max-md:size-9">
+                        <Button size="icon-xs" variant="ghost" aria-label={msg().editItem(m.title)} title={msg().edit} onClick={() => setDialog({ open: true, editing: m })} className="max-md:size-9">
                           <Pencil aria-hidden />
                         </Button>
                       </TableCell>

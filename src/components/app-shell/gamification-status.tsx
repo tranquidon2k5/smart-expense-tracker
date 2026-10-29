@@ -6,14 +6,15 @@ import type { GamificationStatus } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/provider";
+import { shellMessages } from "@/i18n/messages/shell";
 
 /** Pill ngọn lửa chuỗi ngày. Hôm nay chưa ghi → icon outline xám, không dùng đỏ (PRD §6.1) */
 export function StreakPill({ status, className }: { status?: GamificationStatus; className?: string }) {
+  const t = useT(shellMessages).streak;
   if (!status) return <Skeleton className={cn("h-9 w-16 rounded-full", className)} />;
   const { streak, activeToday } = status;
-  const label = activeToday
-    ? `Chuỗi ${streak.currentStreak} ngày. Hôm nay đã ghi chép.`
-    : `Chuỗi ${streak.currentStreak} ngày. Hôm nay chưa ghi chép.`;
+  const label = t.aria(streak.currentStreak, activeToday);
 
   return (
     <Tooltip>
@@ -38,13 +39,13 @@ export function StreakPill({ status, className }: { status?: GamificationStatus;
         </Link>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="max-w-60">
-        <p className="font-medium">Chuỗi {streak.currentStreak} ngày · kỷ lục {streak.longestStreak} ngày</p>
+        <p className="font-medium">{t.title(streak.currentStreak, streak.longestStreak)}</p>
         <p className="mt-0.5 opacity-80">
-          {activeToday ? "Hôm nay bạn đã giữ lửa rồi." : "Ghi 1 khoản để giữ chuỗi hôm nay."}
+          {activeToday ? t.keptToday : t.keepToday}
         </p>
         {streak.freezeCount > 0 && (
           <p className="mt-1 inline-flex items-center gap-1 opacity-80">
-            <Snowflake aria-hidden className="size-3" /> {streak.freezeCount} thẻ đóng băng
+            <Snowflake aria-hidden className="size-3" /> {t.freezes(streak.freezeCount)}
           </p>
         )}
       </TooltipContent>
@@ -54,6 +55,7 @@ export function StreakPill({ status, className }: { status?: GamificationStatus;
 
 /** Thanh XP: luôn kèm nhãn số (MASTER.md › Thanh tiến độ) */
 export function XpMeter({ status, className }: { status?: GamificationStatus; className?: string }) {
+  const t = useT(shellMessages).xp;
   if (!status) return <Skeleton className={cn("h-9 w-40", className)} />;
   const { level, levelTitle, xpInLevel, xpForNextLevel } = status;
   const pct = Math.min(100, (xpInLevel / xpForNextLevel) * 100);
@@ -67,7 +69,7 @@ export function XpMeter({ status, className }: { status?: GamificationStatus; cl
             "flex h-9 items-center gap-2.5 rounded-lg px-2 transition-colors duration-150 hover:bg-row-hover",
             className,
           )}
-          aria-label={`Cấp ${level}, ${levelTitle}. ${xpInLevel} trên ${xpForNextLevel} XP`}
+          aria-label={t.aria(level, levelTitle, xpInLevel, xpForNextLevel)}
         >
           <span aria-hidden className="inline-flex size-7 items-center justify-center rounded-full bg-xp-soft text-xp-text">
             <Star className="size-4 fill-xp/30" />
@@ -75,7 +77,7 @@ export function XpMeter({ status, className }: { status?: GamificationStatus; cl
           <span aria-hidden className="flex min-w-0 flex-col gap-1">
             <span className="flex items-baseline justify-between gap-2 text-xs leading-none">
               <span className="font-semibold text-xp-text">
-                Cấp <span className="num">{level}</span>
+                {t.level} <span className="num">{level}</span>
               </span>
               {/* Số XP hiện từ 1280px; nhỏ hơn xem trong tooltip */}
               <span className="num text-muted-foreground max-xl:hidden">
@@ -89,7 +91,7 @@ export function XpMeter({ status, className }: { status?: GamificationStatus; cl
         </Link>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        {levelTitle} · <span className="num">{xpInLevel}/{xpForNextLevel}</span> XP · còn <span className="num">{xpForNextLevel - xpInLevel}</span> XP để lên cấp {level + 1}
+        {levelTitle} · <span className="num">{xpInLevel}/{xpForNextLevel}</span> XP · {t.toNext(xpForNextLevel - xpInLevel, level + 1)}
       </TooltipContent>
     </Tooltip>
   );

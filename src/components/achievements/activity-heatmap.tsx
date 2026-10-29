@@ -8,10 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Panel } from "@/components/panel";
 import { formatMonthLong, formatWeekdayDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { achievementsMessages } from "@/i18n/messages/achievements";
+
+const msg = () => getMessages(achievementsMessages);
 
 /** 5 mức teal từ --muted tới --primary (MASTER.md › Lịch ghi chép) */
 const LEVEL_BG = ["bg-muted", "bg-heat-1", "bg-heat-2", "bg-heat-3", "bg-primary"];
-const LEVEL_LABEL = ["Không ghi chép", "1 lần", "2–3 lần", "4–5 lần", "Từ 6 lần"];
 
 function level(count: number) {
   if (count <= 0) return 0;
@@ -22,10 +25,11 @@ function level(count: number) {
 }
 
 function describe(d: ActivityDay, today: string) {
-  const when = formatWeekdayDate(d.date) + (d.date === today ? " (hôm nay)" : "");
-  if (d.frozen) return `${when}: dùng thẻ đóng băng, chuỗi được giữ`;
-  if (d.count === 0) return `${when}: chưa ghi chép`;
-  return `${when}: ${d.count} lần ghi chép`;
+  const t = msg().heatmap;
+  const when = formatWeekdayDate(d.date) + (d.date === today ? t.today : "");
+  if (d.frozen) return t.frozen(when);
+  if (d.count === 0) return t.none(when);
+  return t.count(when, d.count);
 }
 
 /**
@@ -84,33 +88,32 @@ export function ActivityHeatmap({ days, today }: { days: ActivityDay[]; today: s
     return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [days]);
 
-  const WEEKDAY_LABELS = ["T2", "", "T4", "", "T6", "", "CN"];
+  const WEEKDAY_LABELS = msg().heatmap.weekdays;
 
   return (
     <Panel
-      title="Lịch ghi chép"
+      title={msg().heatmap.title}
       icon={<CalendarDays aria-hidden className="size-5 text-muted-foreground" />}
       description={
         <>
-          <span className="num">{activeDays}</span> ngày có ghi chép · <span className="num">{totalActions}</span> lần ghi trong{" "}
-          <span className="num">{weeks.length}</span> tuần gần nhất
+          <span className="num">{msg().heatmap.summary(activeDays, totalActions, weeks.length)}</span>
         </>
       }
       action={
         <Button variant="ghost" size="sm" aria-pressed={asTable} onClick={() => setAsTable((v) => !v)} className="text-muted-foreground max-md:h-11">
           {asTable ? <CalendarDays aria-hidden /> : <Table2 aria-hidden />}
-          {asTable ? "Xem lịch" : "Xem dạng bảng"}
+          {asTable ? msg().heatmap.showCalendar : msg().heatmap.showTable}
         </Button>
       }
     >
       {asTable ? (
-        <Table aria-label="Số ngày ghi chép theo tháng">
+        <Table aria-label={msg().heatmap.tableLabel}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="px-2">Tháng</TableHead>
-              <TableHead className="px-2 text-right">Ngày có ghi chép</TableHead>
-              <TableHead className="px-2 text-right">Lần ghi chép</TableHead>
-              <TableHead className="px-2 text-right">Ngày đóng băng</TableHead>
+              <TableHead className="px-2">{msg().heatmap.month}</TableHead>
+              <TableHead className="px-2 text-right">{msg().heatmap.activeDays}</TableHead>
+              <TableHead className="px-2 text-right">{msg().heatmap.actions}</TableHead>
+              <TableHead className="px-2 text-right">{msg().heatmap.frozenDays}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -143,14 +146,14 @@ export function ActivityHeatmap({ days, today }: { days: ActivityDay[]; today: s
                     const first = w.find((d) => d.date.endsWith("-01"));
                     return (
                       <span key={i} className="num w-4 overflow-visible whitespace-nowrap">
-                        {first ? `T${Number(first.date.slice(5, 7))}` : ""}
+                        {first ? msg().heatmap.monthShort(Number(first.date.slice(5, 7))) : ""}
                       </span>
                     );
                   })}
                 </div>
                 <div
                   role="grid"
-                  aria-label="Lịch ghi chép theo ngày. Dùng phím mũi tên để di chuyển."
+                  aria-label={msg().heatmap.gridLabel}
                   onKeyDown={onKeyDown}
                   className="flex gap-[3px]"
                 >
@@ -194,23 +197,23 @@ export function ActivityHeatmap({ days, today }: { days: ActivityDay[]; today: s
             {current ? describe(current, today) : null}
           </p>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground" aria-label="Chú thích">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground" aria-label={msg().heatmap.legend}>
             <span className="flex items-center gap-1.5">
-              Ít
+              {msg().heatmap.less}
               {LEVEL_BG.map((bg, i) => (
-                <span key={i} title={LEVEL_LABEL[i]} className={cn("inline-block size-3.5 rounded-[3px]", bg)} />
+                <span key={i} title={msg().heatmap.levels[i]} className={cn("inline-block size-3.5 rounded-[3px]", bg)} />
               ))}
-              Nhiều
+              {msg().heatmap.more}
             </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-flex size-3.5 items-center justify-center rounded-[3px] bg-freeze-soft">
                 <Snowflake aria-hidden className="size-2.5 text-freeze" />
               </span>
-              Dùng thẻ đóng băng
+              {msg().heatmap.freezeUsed}
             </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block size-3.5 rounded-[3px] bg-muted ring-1 ring-foreground ring-offset-1" />
-              Hôm nay
+              {msg().heatmap.todayLegend}
             </span>
           </div>
         </div>

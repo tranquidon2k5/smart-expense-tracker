@@ -6,6 +6,10 @@ import { useQuickAdd } from "@/components/quick-add/quick-add-provider";
 import { useServiceQuery } from "@/hooks/use-service-query";
 import { dashboardService, gamificationService, transactionService } from "@/services";
 import { formatMonthLong, formatWeekdayDate } from "@/lib/format";
+import { getMessages } from "@/i18n/core";
+import { dashboardMessages } from "@/i18n/messages/dashboard";
+
+const t = () => getMessages(dashboardMessages);
 import { CategoryDonut } from "./category-donut";
 import { KpiCards } from "./kpi-cards";
 import { RecentTransactions } from "./recent-transactions";
@@ -37,9 +41,9 @@ export function Dashboard() {
     <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-4 py-6 md:px-6 xl:gap-8 xl:px-8 xl:py-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl leading-8 font-bold">Tổng quan {formatMonthLong(month).toLowerCase()}</h1>
+          <h1 className="text-2xl leading-8 font-bold">{t().title(formatMonthLong(month))}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            <span className="num">{formatWeekdayDate(today)}</span> · số liệu tính đến hôm nay
+            <span className="num">{formatWeekdayDate(today)}</span> · {t().asOfToday}
           </p>
         </div>
         {!!pending.data && (
@@ -48,12 +52,12 @@ export function Dashboard() {
             className="inline-flex h-9 items-center gap-2 rounded-lg border bg-card px-3 text-sm font-medium transition-colors duration-150 hover:bg-row-hover"
           >
             <Sparkles aria-hidden className="size-4 text-info" />
-            <span className="num">{pending.data}</span> giao dịch AI chờ bạn duyệt
+            <span className="num">{pending.data}</span> {t().pendingLink}
           </Link>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 xl:grid-cols-4 xl:gap-6" aria-label="Chỉ số chính" role="group">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 xl:grid-cols-4 xl:gap-6" aria-label={t().kpiGroup} role="group">
         <KpiCards summary={summary.data} loading={summary.loading} today={today} />
       </div>
 

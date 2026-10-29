@@ -14,13 +14,27 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { adminService } from "@/services";
 import { formatDate, formatPercent } from "@/lib/format";
 import { AdminHeader } from "./admin-shell";
+import { getActiveLocale, getMessages, INTL_LOCALE } from "@/i18n/core";
+import { adminMessages } from "@/i18n/messages/admin";
 
-const nf = new Intl.NumberFormat("vi-VN");
+const msg = () => getMessages(adminMessages);
+
+const nf = { format: (v: number) => new Intl.NumberFormat(INTL_LOCALE[getActiveLocale()]).format(v) };
 const n = (v: number) => nf.format(v);
 
 const config = {
-  transactions: { label: "Giao dịch", color: "var(--primary)" },
-  aiCalls: { label: "Lượt gọi AI", color: "var(--info)" },
+  transactions: {
+    get label() {
+      return msg().stats.transactions;
+    },
+    color: "var(--primary)",
+  },
+  aiCalls: {
+    get label() {
+      return msg().stats.aiCalls;
+    },
+    color: "var(--info)",
+  },
 } satisfies ChartConfig;
 
 function Swatch({ dashed, color }: { dashed?: boolean; color: string }) {
@@ -49,22 +63,22 @@ function DailyTooltip({ active, payload }: { active?: boolean; payload?: { paylo
       <p className="num font-medium">{formatDate(p.date)}</p>
       <p className="flex justify-between gap-4">
         <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Swatch color="var(--primary)" /> Giao dịch
+          <Swatch color="var(--primary)" /> {msg().stats.transactions}
         </span>
         <span className="num">{n(p.transactions)}</span>
       </p>
       <p className="flex justify-between gap-4">
         <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Swatch dashed color="var(--info)" /> Lượt gọi AI
+          <Swatch dashed color="var(--info)" /> {msg().stats.aiCalls}
         </span>
         <span className="num">{n(p.aiCalls)}</span>
       </p>
       <p className="flex justify-between gap-4">
-        <span className="text-muted-foreground">Gọi AI lỗi</span>
+        <span className="text-muted-foreground">{msg().stats.aiFailed}</span>
         <span className="num">{n(p.aiFailures)}</span>
       </p>
       <p className="flex justify-between gap-4">
-        <span className="text-muted-foreground">Người dùng hoạt động</span>
+        <span className="text-muted-foreground">{msg().stats.activeUsers}</span>
         <span className="num">{n(p.activeUsers)}</span>
       </p>
     </div>
@@ -79,9 +93,9 @@ export function SystemStatsPage() {
   if (stats.error) {
     return (
       <>
-        <AdminHeader title="Thống kê hệ thống" />
+        <AdminHeader title={msg().stats.title} />
         <Panel>
-          <ErrorState title="Không tải được thống kê" error={stats.error} onRetry={stats.refetch} />
+          <ErrorState title={msg().stats.loadFailed} error={stats.error} onRetry={stats.refetch} />
         </Panel>
       </>
     );
@@ -94,8 +108,8 @@ export function SystemStatsPage() {
   return (
     <>
       <AdminHeader
-        title="Thống kê hệ thống"
-        description={first && last ? `30 ngày gần nhất: ${formatDate(first.date)} – ${formatDate(last.date)}` : "30 ngày gần nhất"}
+        title={msg().stats.title}
+        description={first && last ? msg().stats.range(formatDate(first.date), formatDate(last.date)) : msg().stats.last30}
       />
 
       <dl className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" aria-busy={!s}>
@@ -103,15 +117,15 @@ export function SystemStatsPage() {
           Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-[86px] rounded-lg" />)
         ) : (
           <>
-            <Kpi label="Người dùng" value={n(s.totalUsers)} hint={`+${n(s.newUsers30d)} trong 30 ngày`} />
-            <Kpi label="Hoạt động 7 ngày" value={n(s.activeUsers7d)} hint={`${formatPercent((s.activeUsers7d / s.totalUsers) * 100)} người dùng`} />
-            <Kpi label="Giao dịch 30 ngày" value={n(s.transactions30d)} hint={`Tổng ${n(s.totalTransactions)}`} />
-            <Kpi label="Lượt gọi AI 30 ngày" value={n(s.aiCalls30d)} hint={`Thành công ${formatPercent(s.aiSuccessRate * 100, 1)}`} />
-            <Kpi label="Độ trễ AI trung bình" value={`${n(s.aiAvgLatencyMs)} ms`} hint="Mục tiêu dưới 3.000 ms" />
+            <Kpi label={msg().stats.users} value={n(s.totalUsers)} hint={msg().stats.newUsers(n(s.newUsers30d))} />
+            <Kpi label={msg().stats.active7} value={n(s.activeUsers7d)} hint={msg().stats.ofUsers(formatPercent((s.activeUsers7d / s.totalUsers) * 100))} />
+            <Kpi label={msg().stats.tx30} value={n(s.transactions30d)} hint={msg().stats.total(n(s.totalTransactions))} />
+            <Kpi label={msg().stats.ai30} value={n(s.aiCalls30d)} hint={msg().stats.success(formatPercent(s.aiSuccessRate * 100, 1))} />
+            <Kpi label={msg().stats.latency} value={`${n(s.aiAvgLatencyMs)} ms`} hint={msg().stats.latencyGoal} />
             <Kpi
-              label="Tỷ lệ giữ chuỗi"
+              label={msg().stats.retention}
               value={formatPercent(s.streakRetention * 100)}
-              hint={`trên ${n(s.streakRetentionBase)} người hoạt động 30 ngày`}
+              hint={msg().stats.retentionBase(n(s.streakRetentionBase))}
             />
           </>
         )}
@@ -119,13 +133,13 @@ export function SystemStatsPage() {
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-12">
         <Panel
-          title="Giao dịch và lượt gọi AI mỗi ngày"
+          title={msg().stats.daily}
           className="xl:col-span-8"
           action={
             s && (
               <Button variant="ghost" size="sm" aria-pressed={asTable} onClick={() => setAsTable((v) => !v)} className="text-muted-foreground">
                 {asTable ? <ChartLine aria-hidden /> : <Table2 aria-hidden />}
-                {asTable ? "Xem biểu đồ" : "Xem dạng bảng"}
+                {asTable ? msg().stats.showChart : msg().stats.showTable}
               </Button>
             )
           }
@@ -133,14 +147,14 @@ export function SystemStatsPage() {
           {!s ? (
             <Skeleton className="h-[260px]" />
           ) : asTable ? (
-            <Table aria-label="Số liệu hệ thống theo ngày" containerClassName="max-h-[320px] overflow-y-auto">
+            <Table aria-label={msg().stats.tableLabel} containerClassName="max-h-[320px] overflow-y-auto">
               <TableHeader className="sticky top-0 bg-card">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>Ngày</TableHead>
-                  <TableHead className="text-right">Giao dịch</TableHead>
-                  <TableHead className="text-right">Gọi AI</TableHead>
-                  <TableHead className="text-right">AI lỗi</TableHead>
-                  <TableHead className="text-right">Người hoạt động</TableHead>
+                  <TableHead>{msg().stats.date}</TableHead>
+                  <TableHead className="text-right">{msg().stats.transactions}</TableHead>
+                  <TableHead className="text-right">{msg().stats.aiCallsShort}</TableHead>
+                  <TableHead className="text-right">{msg().stats.aiErrors}</TableHead>
+                  <TableHead className="text-right">{msg().stats.activeShort}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -159,15 +173,14 @@ export function SystemStatsPage() {
             <>
               <div aria-hidden className="mb-2 flex gap-4 text-[13px]">
                 <span className="flex items-center gap-1.5">
-                  <Swatch color="var(--primary)" /> Giao dịch
+                  <Swatch color="var(--primary)" /> {msg().stats.transactions}
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Swatch dashed color="var(--info)" /> Lượt gọi AI
+                  <Swatch dashed color="var(--info)" /> {msg().stats.aiCalls}
                 </span>
               </div>
               <p className="sr-only">
-                Trong 30 ngày có {n(s.transactions30d)} giao dịch và {n(s.aiCalls30d)} lượt gọi AI. Ngày gần nhất {formatDate(last!.date)}: {n(last!.transactions)}{" "}
-                giao dịch, {n(last!.aiCalls)} lượt gọi AI.
+                {msg().stats.sr(n(s.transactions30d), n(s.aiCalls30d), formatDate(last!.date), n(last!.transactions), n(last!.aiCalls))}
               </p>
               <ChartContainer config={config} className="aspect-auto h-[240px] w-full">
                 <LineChart data={s.daily} margin={{ top: 8, right: 12, left: 0, bottom: 0 }} accessibilityLayer>
@@ -192,16 +205,16 @@ export function SystemStatsPage() {
         </Panel>
 
         <div className="flex flex-col gap-4 xl:col-span-4">
-          <Panel title="Lượt gọi AI theo tính năng" description="30 ngày gần nhất">
+          <Panel title={msg().stats.byFeature} description={msg().stats.last30}>
             {!s ? (
               <Skeleton className="h-40" />
             ) : (
-              <Table aria-label="Lượt gọi AI theo tính năng">
+              <Table aria-label={msg().stats.byFeature}>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="px-1">Tính năng</TableHead>
-                    <TableHead className="px-1 text-right">Lượt gọi</TableHead>
-                    <TableHead className="px-1 text-right">Lỗi</TableHead>
+                    <TableHead className="px-1">{msg().stats.feature}</TableHead>
+                    <TableHead className="px-1 text-right">{msg().stats.calls}</TableHead>
+                    <TableHead className="px-1 text-right">{msg().stats.errors}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -209,7 +222,7 @@ export function SystemStatsPage() {
                     <TableRow key={f.feature}>
                       <TableCell className="px-1">
                         <span className="flex flex-col gap-1">
-                          {f.label}
+                          {msg().stats.features[f.feature] ?? f.label}
                           <span aria-hidden className="block h-1.5 rounded-full bg-info" style={{ width: `${(f.calls / maxCalls) * 100}%` }} />
                         </span>
                       </TableCell>
@@ -225,12 +238,11 @@ export function SystemStatsPage() {
             <p className="flex gap-2 text-[13px] text-muted-foreground">
               <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
               <span>
-                <span className="font-medium text-foreground">Tỷ lệ giữ chuỗi</span> = số người dùng đang có chuỗi ghi chép từ 1 ngày trở lên, chia cho số người
-                dùng hoạt động trong 30 ngày. Không gồm tài khoản quản trị.
+                <span className="font-medium text-foreground">{msg().stats.retention}</span> {msg().stats.retentionNote}
                 {s && s.lockedUsers > 0 && (
                   <>
                     {" "}
-                    Hiện có <span className="num">{s.lockedUsers}</span> tài khoản bị khoá.
+                    <span className="num">{msg().stats.locked(s.lockedUsers)}</span>
                   </>
                 )}
               </span>

@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/sidebar";
 import { NAV_MAIN, NAV_SECONDARY, type NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/provider";
+import { shellMessages } from "@/i18n/messages/shell";
 
 function isActive(pathname: string | null, href: string) {
   if (pathname === null) return false;
@@ -74,13 +76,14 @@ function Nav({ items }: { items: NavItem[] }) {
 }
 
 export function AppSidebar() {
+  const t = useT(shellMessages);
   return (
-    <Sidebar collapsible="icon" aria-label="Điều hướng chính">
+    <Sidebar collapsible="icon" aria-label={t.mainNav}>
       <SidebarHeader className="h-16 justify-center border-b px-4 group-data-[collapsible=icon]:px-0">
         <Link
           href="/"
           className="flex items-center gap-2.5 rounded-lg group-data-[collapsible=icon]:justify-center"
-          aria-label="Sổ Tiền — về trang Tổng quan"
+          aria-label={t.homeLink}
         >
           <span aria-hidden className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <NotebookPen className="size-5" />

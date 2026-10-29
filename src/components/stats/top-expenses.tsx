@@ -12,6 +12,10 @@ import { EmptyState } from "@/components/empty-state";
 import { Money } from "@/components/money";
 import { Panel } from "@/components/panel";
 import { formatDate, formatMoney, formatPercent } from "@/lib/format";
+import { getMessages } from "@/i18n/core";
+import { statsMessages } from "@/i18n/messages/stats";
+
+const msg = () => getMessages(statsMessages);
 
 /**
  * Top 5 khoản chi lớn nhất: thanh ngang xếp hạng (độ dài theo số tiền, màu theo danh mục,
@@ -35,18 +39,18 @@ export function TopExpenses({
 
   return (
     <Panel
-      title="5 khoản chi lớn nhất"
+      title={msg().top.title}
       description={
         items.length && totalExpense
-          ? `Chiếm ${formatPercent((sum / totalExpense) * 100)} tổng chi trong khoảng đã chọn`
-          : "Những khoản tốn nhiều tiền nhất trong khoảng đã chọn"
+          ? msg().top.share(formatPercent((sum / totalExpense) * 100))
+          : msg().top.fallback
       }
       className={className}
       action={
         items.length > 0 && (
           <Button variant="ghost" size="sm" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable} className="text-muted-foreground max-md:h-11">
             {asTable ? <ListOrdered aria-hidden /> : <Table2 aria-hidden />}
-            {asTable ? "Xem biểu đồ" : "Xem dạng bảng"}
+            {asTable ? msg().showChart : msg().showTable}
           </Button>
         )
       }
@@ -61,16 +65,16 @@ export function TopExpenses({
           ))}
         </div>
       ) : items.length === 0 ? (
-        <EmptyState icon={ListOrdered} className="min-h-[240px]" title="Chưa có khoản chi nào" description="Khi có khoản chi trong khoảng này, khoản lớn nhất sẽ hiện ở đây." />
+        <EmptyState icon={ListOrdered} className="min-h-[240px]" title={msg().top.emptyTitle} description={msg().top.emptyText} />
       ) : asTable ? (
-        <Table aria-label="5 khoản chi lớn nhất">
+        <Table aria-label={msg().top.title}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-10 px-2 text-right">#</TableHead>
-              <TableHead className="px-2">Nội dung</TableHead>
-              <TableHead className="px-2">Danh mục</TableHead>
-              <TableHead className="w-28 px-2">Ngày</TableHead>
-              <TableHead className="px-2 text-right">Số tiền</TableHead>
+              <TableHead className="px-2">{msg().top.description}</TableHead>
+              <TableHead className="px-2">{msg().category}</TableHead>
+              <TableHead className="w-28 px-2">{msg().top.date}</TableHead>
+              <TableHead className="px-2 text-right">{msg().top.amount}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -92,12 +96,12 @@ export function TopExpenses({
           </TableBody>
         </Table>
       ) : (
-        <ol className="flex flex-col gap-1" aria-label="5 khoản chi lớn nhất, lớn nhất trước">
+        <ol className="flex flex-col gap-1" aria-label={msg().top.listLabel}>
           {items.map((t, i) => (
             <li key={t.id}>
               <Link
                 href={`/giao-dich?id=${t.id}`}
-                aria-label={`${i + 1}. ${t.description}, ${t.category.name}, ngày ${formatDate(t.date)}, chi ${formatMoney(t.amount)}`}
+                aria-label={msg().top.itemLabel(i + 1, t.description, t.category.name, formatDate(t.date), formatMoney(t.amount))}
                 className="-mx-2 flex flex-col gap-1.5 rounded-lg px-2 py-2 transition-colors duration-150 hover:bg-row-hover"
               >
                 <span className="flex items-baseline gap-2 text-sm">

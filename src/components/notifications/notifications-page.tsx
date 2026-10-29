@@ -13,6 +13,11 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { notificationService, settingsService, transactionService } from "@/services";
 import { FilterTabs } from "./notification-bell";
 import { NotificationList } from "./notification-list";
+import { getMessages } from "@/i18n/core";
+import { notificationsMessages } from "@/i18n/messages/notifications";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(notificationsMessages);
 
 /** Trung tâm thông báo (PRD §6.3): danh sách đầy đủ + tình trạng nhắc nhở */
 export function NotificationsPage() {
@@ -26,28 +31,28 @@ export function NotificationsPage() {
   const sendTest = async () => {
     try {
       await notificationService.sendTestReminder();
-      toast.success("Đã gửi một nhắc nhở thử");
+      toast.success(msg().testSent);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Không gửi được nhắc nhở thử");
+      toast.error(e instanceof Error ? te(e.message) : msg().testFailed);
     }
   };
 
   return (
     <PageContainer>
       <PageHeader
-        title="Thông báo"
+        title={msg().title}
         description={
           unread.data ? (
             <>
-              Bạn có <span className="num">{unread.data}</span> thông báo chưa đọc
+              <span className="num">{msg().unreadCount(unread.data)}</span>
             </>
           ) : (
-            "Nhắc nhở giữ chuỗi, chúc mừng thành tích và cảnh báo ngân sách"
+            msg().intro
           )
         }
         actions={
           <Button variant="outline" disabled={!unread.data} onClick={() => void notificationService.markAllRead()}>
-            <CheckCheck aria-hidden /> Đánh dấu tất cả đã đọc
+            <CheckCheck aria-hidden /> {msg().markAllRead}
           </Button>
         }
       />
@@ -67,7 +72,7 @@ export function NotificationsPage() {
         </Panel>
 
         <Panel
-          title="Nhắc nhở ghi chép"
+          title={msg().reminderTitle}
           icon={reminder?.enabled === false ? <BellOff aria-hidden className="size-5 text-muted-foreground" /> : <BellRing aria-hidden className="size-5 text-primary" />}
           className="xl:col-span-4"
         >
@@ -75,21 +80,20 @@ export function NotificationsPage() {
             <Skeleton className="h-16 w-full" />
           ) : reminder.enabled ? (
             <p className="text-sm">
-              Nếu tới <span className="num font-semibold">{reminder.time}</span> mà hôm nay bạn chưa ghi khoản nào, Sổ Tiền sẽ nhắc một lần trong
-              app{reminder.email ? " và qua email" : ""}.
+              {msg().reminderOnBefore} <span className="num font-semibold">{reminder.time}</span> {msg().reminderOnAfter(!!reminder.email)}
             </p>
           ) : (
-            <p className="text-sm">Nhắc nhở đang tắt. Bạn sẽ không nhận lời nhắc nào, chuỗi ngày vẫn được tính như bình thường.</p>
+            <p className="text-sm">{msg().reminderOff}</p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
               <Link href="/cai-dat#nhac-nho">
-                <Settings aria-hidden /> Đổi giờ hoặc tắt
+                <Settings aria-hidden /> {msg().change}
               </Link>
             </Button>
             {reminder?.enabled && (
               <Button variant="ghost" size="sm" onClick={() => void sendTest()}>
-                Gửi thử một nhắc nhở
+                {msg().sendTest}
               </Button>
             )}
           </div>

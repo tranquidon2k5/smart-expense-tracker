@@ -3,18 +3,18 @@
 import * as React from "react";
 import type { TransactionFilter, TransactionType } from "@/types";
 import { addDaysIso, formatDate } from "@/lib/format";
+import { getMessages } from "@/i18n/core";
+import { transactionsMessages } from "@/i18n/messages/transactions";
+
+const msg = () => getMessages(transactionsMessages);
 
 export type PeriodKey = "thang-nay" | "thang-truoc" | "7-ngay" | "30-ngay" | "3-thang" | "tat-ca" | "tuy-chon";
 
-export const PERIOD_LABELS: Record<PeriodKey, string> = {
-  "thang-nay": "Tháng này",
-  "thang-truoc": "Tháng trước",
-  "7-ngay": "7 ngày qua",
-  "30-ngay": "30 ngày qua",
-  "3-thang": "3 tháng qua",
-  "tat-ca": "Mọi thời gian",
-  "tuy-chon": "Tuỳ chọn",
-};
+export const PERIOD_KEYS: PeriodKey[] = ["thang-nay", "thang-truoc", "7-ngay", "30-ngay", "3-thang", "tat-ca", "tuy-chon"];
+
+export function periodName(key: PeriodKey): string {
+  return msg().filters.periods[key];
+}
 
 export interface FilterState {
   period: PeriodKey;
@@ -68,7 +68,7 @@ export function periodLabel(state: FilterState): string {
       ? formatDate(state.range.from)
       : `${formatDate(state.range.from)} – ${formatDate(to)}`;
   }
-  return PERIOD_LABELS[state.period];
+  return periodName(state.period);
 }
 
 /** Bộ lọc đang khác mặc định (để hiện nút "Xoá bộ lọc") */

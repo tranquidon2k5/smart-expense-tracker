@@ -7,10 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormAlert, FormField, PasswordChecklist, PasswordInput } from "@/components/form-field";
 import { authService } from "@/services";
+import { useT } from "@/i18n/provider";
+import { authMessages } from "@/i18n/messages/auth";
+import { te } from "@/i18n/errors";
 
 const RESEND_SECONDS = 30;
 
 export function ForgotPasswordForm() {
+  const t = useT(authMessages);
+  const tf = t.forgot;
   const [step, setStep] = React.useState<"email" | "code" | "done">("email");
   const [email, setEmail] = React.useState("");
   const [code, setCode] = React.useState("");
@@ -43,7 +48,7 @@ export function ForgotPasswordForm() {
       setStep("code");
       setCooldown(RESEND_SECONDS);
     } catch (e) {
-      setErrors({ email: e instanceof Error ? e.message : "Không gửi được mã" });
+      setErrors({ email: e instanceof Error ? te(e.message) : tf.sendFailed });
     } finally {
       setPending(false);
     }
@@ -52,9 +57,9 @@ export function ForgotPasswordForm() {
   const reset = async (e: React.FormEvent) => {
     e.preventDefault();
     const next = {
-      code: /^\d{6}$/.test(code.trim()) ? undefined : "Mã gồm 6 chữ số",
+      code: /^\d{6}$/.test(code.trim()) ? undefined : tf.codeFormat,
       password: authService.validatePassword(password) ?? undefined,
-      confirm: confirm !== password ? "Hai mật khẩu chưa giống nhau" : undefined,
+      confirm: confirm !== password ? tf.mismatch : undefined,
     };
     setErrors(next);
     if (next.code || next.password || next.confirm) return;
@@ -64,7 +69,7 @@ export function ForgotPasswordForm() {
       setStep("done");
     } catch (err) {
       const field = err instanceof authService.AuthError && err.field === "password" ? "password" : "code";
-      setErrors({ [field]: err instanceof Error ? err.message : "Không đặt lại được mật khẩu" });
+      setErrors({ [field]: err instanceof Error ? te(err.message) : tf.resetFailed });
     } finally {
       setPending(false);
     }
@@ -77,11 +82,11 @@ export function ForgotPasswordForm() {
           <CircleCheck className="size-6" />
         </span>
         <h1 ref={headingRef} tabIndex={-1} className="text-2xl leading-8 font-bold outline-none">
-          Đã đổi mật khẩu
+          {tf.doneTitle}
         </h1>
-        <p className="text-sm text-muted-foreground">Bạn đăng nhập bằng mật khẩu mới nhé.</p>
+        <p className="text-sm text-muted-foreground">{tf.doneText}</p>
         <Button asChild className="h-11 w-full md:h-10">
-          <Link href="/dang-nhap">Đăng nhập</Link>
+          <Link href="/dang-nhap">{tf.loginLink}</Link>
         </Button>
       </div>
     );
@@ -90,26 +95,26 @@ export function ForgotPasswordForm() {
   return (
     <div className="flex flex-col gap-6">
       <Link href="/dang-nhap" className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-        <ArrowLeft aria-hidden className="size-4" /> Quay lại đăng nhập
+        <ArrowLeft aria-hidden className="size-4" /> {tf.back}
       </Link>
 
       {step === "email" ? (
         <>
           <div>
             <h1 ref={headingRef} tabIndex={-1} className="text-2xl leading-8 font-bold outline-none">
-              Quên mật khẩu
+              {tf.title}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">Nhập email đã đăng ký, Sổ Tiền sẽ gửi mã 6 số để bạn đặt mật khẩu mới.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{tf.subtitle}</p>
           </div>
           <form noValidate onSubmit={sendCode} className="flex flex-col gap-4">
-            <FormField label="Email" error={errors.email}>
+            <FormField label={t.email} error={errors.email}>
               {(p) => (
-                <Input {...p} type="email" inputMode="email" autoComplete="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ten@example.com" />
+                <Input {...p} type="email" inputMode="email" autoComplete="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.emailPlaceholder} />
               )}
             </FormField>
             <Button type="submit" disabled={pending} className="h-11 w-full md:h-10">
               {pending && <Loader2 aria-hidden className="motion-safe:animate-spin" />}
-              {pending ? "Đang gửi…" : "Gửi mã đặt lại"}
+              {pending ? tf.sending : tf.send}
             </Button>
           </form>
         </>
@@ -117,22 +122,24 @@ export function ForgotPasswordForm() {
         <>
           <div>
             <h1 ref={headingRef} tabIndex={-1} className="text-2xl leading-8 font-bold outline-none">
-              Nhập mã và mật khẩu mới
+              {tf.codeTitle}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Nếu <span className="font-medium text-foreground">{email}</span> đã đăng ký, mã 6 số vừa được gửi tới hộp thư. Mã có hiệu lực 15 phút.
+              {tf.codeSentBefore}
+              <span className="font-medium text-foreground">{email}</span>
+              {tf.codeSentAfter}
             </p>
           </div>
           {authService.RESET_CODE_HINT && (
             <FormAlert tone="info">
               <span className="flex items-center gap-1.5">
-                <MailCheck aria-hidden className="size-4 text-info" /> Bản demo không gửi email thật: mã là{" "}
+                <MailCheck aria-hidden className="size-4 text-info" /> {tf.demoCode}{" "}
                 <span className="num font-semibold">{authService.RESET_CODE_HINT}</span>
               </span>
             </FormAlert>
           )}
           <form noValidate onSubmit={reset} className="flex flex-col gap-4">
-            <FormField label="Mã xác nhận" error={errors.code}>
+            <FormField label={tf.code} error={errors.code}>
               {(p) => (
                 <Input
                   {...p}
@@ -147,18 +154,18 @@ export function ForgotPasswordForm() {
                 />
               )}
             </FormField>
-            <FormField label="Mật khẩu mới" error={errors.password} hint={<PasswordChecklist checks={authService.passwordChecks(password)} />}>
+            <FormField label={tf.newPassword} error={errors.password} hint={<PasswordChecklist checks={authService.passwordChecks(password)} />}>
               {(p) => <PasswordInput {...p} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />}
             </FormField>
-            <FormField label="Nhập lại mật khẩu mới" error={errors.confirm}>
+            <FormField label={tf.confirmNew} error={errors.confirm}>
               {(p) => <PasswordInput {...p} autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />}
             </FormField>
             <Button type="submit" disabled={pending} className="h-11 w-full md:h-10">
               {pending && <Loader2 aria-hidden className="motion-safe:animate-spin" />}
-              {pending ? "Đang lưu…" : "Đặt mật khẩu mới"}
+              {pending ? tf.saving : tf.submit}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
-              Chưa nhận được mã?{" "}
+              {tf.noCode}{" "}
               <button
                 type="button"
                 disabled={cooldown > 0 || pending}
@@ -166,11 +173,9 @@ export function ForgotPasswordForm() {
                 className="font-medium text-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-muted-foreground disabled:no-underline"
               >
                 {cooldown > 0 ? (
-                  <>
-                    Gửi lại sau <span className="num">{cooldown}</span> giây
-                  </>
+                  <span className="num">{tf.resendIn(cooldown)}</span>
                 ) : (
-                  "Gửi lại mã"
+                  tf.resend
                 )}
               </button>
             </p>

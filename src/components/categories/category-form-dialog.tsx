@@ -11,6 +11,12 @@ import { CATEGORY_ICONS, CategoryChip } from "@/components/category-icon";
 import { categoryService } from "@/services";
 import { CATEGORY_COLORS, CATEGORY_ICON_OPTIONS, CATEGORY_NAME_MAX } from "@/lib/category-style";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { categoriesMessages } from "@/i18n/messages/categories";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(categoriesMessages);
 
 /**
  * Nhóm radio dạng lưới: Tab vào/ra một lần, mũi tên di chuyển + chọn (WAI-ARIA radiogroup).
@@ -87,24 +93,24 @@ export function CategoryFormDialog({
   const colorProps = useRadioGrid(CATEGORY_COLORS, colorIndex, (i) => setForm((f) => ({ ...f, color: CATEGORY_COLORS[i].value })), 8);
 
   const submit = async () => {
-    const v = save ? (form.name.trim().length < 2 ? "Tên danh mục cần ít nhất 2 ký tự." : null) : categoryService.validateCategory(form, editing?.id);
+    const v = save ? (form.name.trim().length < 2 ? msg().form.nameMin : null) : categoryService.validateCategory(form, editing?.id);
     if (v) return setError(v);
     setError(null);
     setSaving(true);
     try {
       if (save) {
         await save(form, editing?.id);
-        toast.success(editing ? `Đã lưu danh mục “${form.name.trim()}”` : `Đã thêm danh mục mặc định “${form.name.trim()}”`);
+        toast.success(editing ? msg().form.savedName(form.name.trim()) : msg().form.addedDefault(form.name.trim()));
       } else if (editing) {
         await categoryService.updateCategory(editing.id, { name: form.name, icon: form.icon, color: form.color });
-        toast.success(`Đã lưu danh mục “${form.name.trim()}”`);
+        toast.success(msg().form.savedName(form.name.trim()));
       } else {
         await categoryService.createCategory(form);
-        toast.success(`Đã thêm danh mục ${form.type === "income" ? "thu" : "chi"} “${form.name.trim()}”`);
+        toast.success(msg().form.added(form.type === "income", form.name.trim()));
       }
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chưa lưu được, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().form.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -117,15 +123,15 @@ export function CategoryFormDialog({
       <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>
-            {editing ? "Sửa danh mục" : "Thêm danh mục"}
-            {scope === "default" && " mặc định"}
+            {editing ? msg().form.editTitle : msg().form.addTitle}
+            {scope === "default" && msg().form.defaultSuffix}
           </DialogTitle>
           <DialogDescription>
             {editing
-              ? "Đổi tên, biểu tượng hoặc màu. Loại thu/chi giữ nguyên để không làm sai các giao dịch cũ."
+              ? msg().form.editText
               : scope === "default"
-                ? "Danh mục mặc định xuất hiện cho mọi người dùng, kể cả tài khoản đã có."
-                : "Tạo danh mục riêng để phân loại chi tiêu theo cách của bạn."}
+                ? msg().form.defaultText
+                : msg().form.addText}
           </DialogDescription>
         </DialogHeader>
 
@@ -143,8 +149,8 @@ export function CategoryFormDialog({
               <PreviewIcon className="size-5" />
             </span>
             <span className="min-w-0">
-              <span className="block truncate font-semibold">{form.name.trim() || "Tên danh mục"}</span>
-              <CategoryChip name={form.type === "income" ? "Khoản thu" : "Khoản chi"} color={form.color} className="text-muted-foreground" />
+              <span className="block truncate font-semibold">{form.name.trim() || msg().form.namePreview}</span>
+              <CategoryChip name={msg().group(form.type === "income")} color={form.color} className="text-muted-foreground" />
             </span>
           </div>
 
@@ -152,7 +158,7 @@ export function CategoryFormDialog({
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <label htmlFor={`${ids}-name`} className="text-[13px] font-medium">
-                  Tên danh mục
+                  {msg().form.name}
                 </label>
                 <span className="num text-xs text-muted-foreground" aria-hidden>
                   {form.name.trim().length}/{CATEGORY_NAME_MAX}
@@ -164,14 +170,14 @@ export function CategoryFormDialog({
                 value={form.name}
                 maxLength={CATEGORY_NAME_MAX}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Vd. Cà phê, Thú cưng, Tiền nhà"
+                placeholder={msg().form.namePlaceholder}
                 aria-invalid={!!error || undefined}
               />
             </div>
             {!editing && (
               <div>
                 <span id={`${ids}-type`} className="mb-1.5 block text-[13px] font-medium">
-                  Loại
+                  {msg().form.type}
                 </span>
                 <div role="radiogroup" aria-labelledby={`${ids}-type`} className="flex rounded-lg border p-0.5">
                   {(["expense", "income"] as const).map((t) => {
@@ -194,7 +200,7 @@ export function CategoryFormDialog({
                         )}
                       >
                         <Icon aria-hidden className="size-4" />
-                        {t === "income" ? "Thu" : "Chi"}
+                        {t === "income" ? getMessages(commonMessages).income : getMessages(commonMessages).expense}
                       </button>
                     );
                   })}
@@ -205,7 +211,7 @@ export function CategoryFormDialog({
 
           <fieldset>
             <legend id={`${ids}-icon`} className="mb-2 text-[13px] font-medium">
-              Biểu tượng
+              {msg().form.icon}
             </legend>
             <div role="radiogroup" aria-labelledby={`${ids}-icon`} className="grid grid-cols-6 gap-1.5 sm:grid-cols-10">
               {CATEGORY_ICON_OPTIONS.map((opt, i) => {
@@ -216,8 +222,8 @@ export function CategoryFormDialog({
                     key={opt.name}
                     type="button"
                     {...iconProps(i)}
-                    aria-label={opt.label}
-                    title={opt.label}
+                    aria-label={msg().icons[opt.name] ?? opt.label}
+                    title={msg().icons[opt.name] ?? opt.label}
                     className={cn(
                       "inline-flex aspect-square min-h-10 items-center justify-center rounded-lg border transition-colors duration-150 hover:bg-row-hover",
                       active ? "border-2 bg-accent" : "border-transparent text-muted-foreground",
@@ -233,7 +239,7 @@ export function CategoryFormDialog({
 
           <fieldset>
             <legend id={`${ids}-color`} className="mb-2 text-[13px] font-medium">
-              Màu <span className="font-normal text-muted-foreground">· {CATEGORY_COLORS[colorIndex]?.name}</span>
+              {msg().form.color} <span className="font-normal text-muted-foreground">· {msg().colors[CATEGORY_COLORS[colorIndex]?.value ?? ""]}</span>
             </legend>
             <div role="radiogroup" aria-labelledby={`${ids}-color`} className="flex flex-wrap gap-2">
               {CATEGORY_COLORS.map((c, i) => {
@@ -243,8 +249,8 @@ export function CategoryFormDialog({
                     key={c.value}
                     type="button"
                     {...colorProps(i)}
-                    aria-label={c.name}
-                    title={c.name}
+                    aria-label={msg().colors[c.value] ?? c.name}
+                    title={msg().colors[c.value] ?? c.name}
                     className={cn(
                       "inline-flex size-10 items-center justify-center rounded-full transition-transform duration-150",
                       active && "ring-2 ring-foreground ring-offset-2 ring-offset-popover",
@@ -268,11 +274,11 @@ export function CategoryFormDialog({
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Huỷ
+            {getMessages(commonMessages).cancel}
           </Button>
           <Button type="submit" form={`${ids}-form`} disabled={saving} aria-busy={saving}>
             {saving && <Loader2 aria-hidden className="animate-spin" />}
-            {editing ? "Lưu thay đổi" : "Thêm danh mục"}
+            {editing ? msg().form.saveChanges : msg().form.addTitle}
           </Button>
         </DialogFooter>
       </DialogContent>

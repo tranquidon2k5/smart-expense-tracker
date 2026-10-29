@@ -10,6 +10,8 @@ import { AppSidebar } from "./app-sidebar";
 import { BottomNav } from "./bottom-nav";
 import { SearchCommand } from "./search-command";
 import { TopBar } from "./top-bar";
+import { useT } from "@/i18n/provider";
+import { shellMessages } from "@/i18n/messages/shell";
 
 function isTyping(target: EventTarget | null) {
   const el = target as HTMLElement | null;
@@ -85,13 +87,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
+  const t = useT(shellMessages);
   return (
     <SidebarProvider>
       <a
         href="#main"
         className="fixed top-2 left-2 z-50 -translate-y-20 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus-visible:translate-y-0"
       >
-        Bỏ qua đến nội dung chính
+        {t.skipToContent}
       </a>
       <RestoreSidebarState />
       <QuickAddProvider>

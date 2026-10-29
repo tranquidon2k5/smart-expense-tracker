@@ -11,29 +11,51 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { getMessages } from "@/i18n/core";
+import { shellMessages } from "@/i18n/messages/shell";
 
 export interface NavItem {
   href: string;
-  label: string;
+  /** Tên trang theo ngôn ngữ đang dùng (getter, đọc lại mỗi lần render) */
+  readonly label: string;
   icon: LucideIcon;
   /** Từ khoá thêm cho ô tìm kiếm (không dấu) */
   keywords?: string;
 }
 
+type NavHref = keyof typeof shellMessages.vi.nav;
+
+function item(href: NavHref, icon: LucideIcon, keywords: string): NavItem {
+  return {
+    href,
+    icon,
+    keywords,
+    get label() {
+      return getMessages(shellMessages).nav[href];
+    },
+  };
+}
+
+/** Tên tiếng Việt và tiếng Anh của một trang, để ô tìm kiếm khớp ở cả hai ngôn ngữ */
+export function navSearchText(n: NavItem): string {
+  const href = n.href as NavHref;
+  return `${shellMessages.vi.nav[href]} ${shellMessages.en.nav[href]} ${n.keywords ?? ""}`;
+}
+
 export const NAV_MAIN: NavItem[] = [
-  { href: "/", label: "Tổng quan", icon: LayoutDashboard, keywords: "dashboard trang chu" },
-  { href: "/giao-dich", label: "Giao dịch", icon: ReceiptText, keywords: "thu chi lich su" },
-  { href: "/thong-ke", label: "Thống kê", icon: ChartColumn, keywords: "bieu do bao cao xu huong so sanh thang" },
-  { href: "/nhap-sao-ke", label: "Nhập sao kê", icon: FileUp, keywords: "import csv ngan hang file excel" },
-  { href: "/ngan-sach", label: "Ngân sách", icon: PiggyBank, keywords: "han muc budget" },
-  { href: "/vi", label: "Ví", icon: Wallet, keywords: "tai khoan ngan hang momo tien mat chuyen tien" },
-  { href: "/danh-muc", label: "Danh mục", icon: Shapes, keywords: "phan loai thu chi icon mau" },
-  { href: "/tro-ly-ai", label: "Trợ lý AI", icon: MessageCircle, keywords: "chatbot hoi dap" },
-  { href: "/thanh-tich", label: "Thành tích", icon: Trophy, keywords: "chuoi huy hieu xp cap do" },
+  item("/", LayoutDashboard, "dashboard trang chu"),
+  item("/giao-dich", ReceiptText, "thu chi lich su"),
+  item("/thong-ke", ChartColumn, "bieu do bao cao xu huong so sanh thang"),
+  item("/nhap-sao-ke", FileUp, "import csv ngan hang file excel"),
+  item("/ngan-sach", PiggyBank, "han muc budget"),
+  item("/vi", Wallet, "tai khoan ngan hang momo tien mat chuyen tien"),
+  item("/danh-muc", Shapes, "phan loai thu chi icon mau"),
+  item("/tro-ly-ai", MessageCircle, "chatbot hoi dap"),
+  item("/thanh-tich", Trophy, "chuoi huy hieu xp cap do"),
 ];
 
 export const NAV_SECONDARY: NavItem[] = [
-  { href: "/cai-dat", label: "Cài đặt", icon: Settings, keywords: "tai khoan nhac nho" },
+  item("/cai-dat", Settings, "tai khoan nhac nho"),
 ];
 
 /** Bottom nav < 768px: 4 mục + nút Ghi nhanh ở giữa (MASTER.md › Responsive) */

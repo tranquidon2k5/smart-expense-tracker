@@ -15,11 +15,15 @@ import { ErrorState } from "@/components/error-state";
 import { Panel } from "@/components/panel";
 import { formatCompactMoney, formatDate, formatMoney, formatMonthLong, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { statsMessages } from "@/i18n/messages/stats";
+
+const msg = () => getMessages(statsMessages);
 
 const MINUS = "−";
 
 function changeText(a: number, b: number): { text: string; dir: "up" | "down" | "same" } {
-  if (a === b) return { text: "không đổi", dir: "same" };
+  if (a === b) return { text: msg().compare.unchanged, dir: "same" };
   if (a === 0) return { text: `+${formatMoney(b)}`, dir: "up" };
   const pct = ((b - a) / a) * 100;
   return { text: `${pct > 0 ? "+" : MINUS}${formatPercent(Math.abs(pct))}`, dir: pct > 0 ? "up" : "down" };
@@ -55,7 +59,7 @@ function CompareTooltip({ active, payload, labels }: { active?: boolean; payload
         <span className="num">{formatMoney(row.amountB)}</span>
       </p>
       <p className="flex justify-between gap-4 border-t pt-1.5">
-        <span className="text-muted-foreground">Thay đổi</span>
+        <span className="text-muted-foreground">{msg().compare.change}</span>
         <Change a={row.amountA} b={row.amountB} />
       </p>
     </div>
@@ -123,34 +127,34 @@ export function MonthCompareChart({
     amountB: { label: labelB, color: "var(--primary)" },
   } satisfies ChartConfig;
 
-  let headline = "Chi tiêu từng danh mục của hai tháng";
+  let headline = msg().compare.fallback;
   if (data && (data.totalsA.expense || data.totalsB.expense)) {
     const c = changeText(data.totalsA.expense, data.totalsB.expense);
     headline =
       c.dir === "same"
-        ? `Tổng chi ${labelB.toLowerCase()} bằng ${labelA.toLowerCase()}`
-        : `Tổng chi ${labelB.toLowerCase()} ${c.dir === "up" ? "cao hơn" : "thấp hơn"} ${labelA.toLowerCase()} ${c.text.replace(/^[+−]/, "")}`;
+        ? msg().compare.equal(labelB, labelA)
+        : msg().compare.diff(labelB, c.dir === "up", labelA, c.text.replace(/^[+−]/, ""));
     // Tháng hiện tại chưa hết: nói rõ để không hiểu nhầm là đã tiết kiệm được
-    if (partial) headline += ` (${formatMonthLong(currentMonth).toLowerCase()} mới tính đến ${formatDate(today)})`;
+    if (partial) headline += msg().compare.partial(formatMonthLong(currentMonth), formatDate(today));
   }
 
   return (
     <Panel
-      title="So sánh hai tháng"
+      title={msg().compare.title}
       description={headline}
       className={className}
       action={
         rows.length > 0 && (
           <Button variant="ghost" size="sm" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable} className="text-muted-foreground max-md:h-11">
             {asTable ? <ChartBar aria-hidden /> : <Table2 aria-hidden />}
-            {asTable ? "Xem biểu đồ" : "Xem dạng bảng"}
+            {asTable ? msg().showChart : msg().showTable}
           </Button>
         )
       }
     >
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <MonthSelect id="cmp-a" label="Tháng gốc" value={monthA} months={months} onChange={(m) => onChange(m, monthB)} />
-        <MonthSelect id="cmp-b" label="So với" value={monthB} months={months} onChange={(m) => onChange(monthA, m)} />
+        <MonthSelect id="cmp-a" label={msg().compare.base} value={monthA} months={months} onChange={(m) => onChange(m, monthB)} />
+        <MonthSelect id="cmp-b" label={msg().compare.against} value={monthB} months={months} onChange={(m) => onChange(monthA, m)} />
       </div>
 
       {error ? (
@@ -161,9 +165,9 @@ export function MonthCompareChart({
           <Skeleton className="flex-1" />
         </div>
       ) : monthA === monthB ? (
-        <EmptyState icon={ChartBar} className="h-[280px]" title="Hãy chọn hai tháng khác nhau" description="Chọn tháng gốc và tháng muốn so sánh." />
+        <EmptyState icon={ChartBar} className="h-[280px]" title={msg().compare.sameTitle} description={msg().compare.sameText} />
       ) : rows.length === 0 ? (
-        <EmptyState icon={ChartBar} className="h-[280px]" title="Hai tháng này chưa có khoản chi" description="Chọn tháng khác để so sánh." />
+        <EmptyState icon={ChartBar} className="h-[280px]" title={msg().compare.emptyTitle} description={msg().compare.emptyText} />
       ) : (
         <>
           <dl className="mb-4 grid grid-cols-2 gap-3 text-sm">
@@ -180,7 +184,7 @@ export function MonthCompareChart({
                     {label === formatMonthLong(currentMonth) && (
                       <span>
                         {" "}
-                        (đến <span className="num">{formatDate(today)}</span>)
+                        ({msg().until} <span className="num">{formatDate(today)}</span>)
                       </span>
                     )}
                   </dt>
@@ -192,13 +196,13 @@ export function MonthCompareChart({
           </dl>
 
           {asTable ? (
-            <Table aria-label={`Chi theo danh mục: ${labelA} và ${labelB}`}>
+            <Table aria-label={msg().compare.tableLabel(labelA, labelB)}>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="px-2">Danh mục</TableHead>
+                  <TableHead className="px-2">{msg().category}</TableHead>
                   <TableHead className="px-2 text-right">{labelA}</TableHead>
                   <TableHead className="px-2 text-right">{labelB}</TableHead>
-                  <TableHead className="px-2 text-right">Thay đổi</TableHead>
+                  <TableHead className="px-2 text-right">{msg().compare.change}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -223,7 +227,7 @@ export function MonthCompareChart({
                 <span className="flex items-center gap-1.5">
                   <span className="size-2.5 rounded-sm bg-primary" /> {labelB}
                 </span>
-                {partial && <span className="text-muted-foreground">Tháng này mới tính đến {formatDate(today)}</span>}
+                {partial && <span className="text-muted-foreground">{msg().compare.partialNote(formatDate(today))}</span>}
               </div>
               <p className="sr-only">
                 {rows.map((r) => `${r.name}: ${labelA} ${formatMoney(r.amountA)}, ${labelB} ${formatMoney(r.amountB)}`).join(". ")}

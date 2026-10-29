@@ -20,6 +20,10 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { statsService, transactionService } from "@/services";
 import { formatBalance, formatDate, formatMoney, formatMonthLong } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { statsMessages } from "@/i18n/messages/stats";
+
+const msg = () => getMessages(statsMessages);
 import { MonthCompareChart } from "./month-compare-chart";
 import { StatsTrendChart } from "./stats-trend-chart";
 import { TopExpenses } from "./top-expenses";
@@ -34,7 +38,7 @@ function shift(month: string, delta: number) {
 /** "5/2026 – 10/2026" hoặc "tháng 10/2026" */
 function rangeLabel(r: StatsRange) {
   const short = (m: string) => `${Number(m.slice(5))}/${m.slice(0, 4)}`;
-  return r.from === r.to ? formatMonthLong(r.from).toLowerCase() : `từ ${short(r.from)} đến ${short(r.to)}`;
+  return r.from === r.to ? msg().rangeMonth(formatMonthLong(r.from)) : msg().rangeMonths(short(r.from), short(r.to));
 }
 
 function Kpi({ label, children, hint, loading }: { label: string; children: React.ReactNode; hint?: React.ReactNode; loading: boolean }) {
@@ -62,16 +66,16 @@ function RangePicker({ range, months, onChange }: { range: StatsRange; months: s
   const first = months[0] ?? range.from;
   const clamp = (m: string) => (m < first ? first : m);
   const presets: { label: string; range: StatsRange }[] = [
-    { label: "Tháng này", range: { from: last, to: last } },
-    { label: "3 tháng", range: { from: clamp(shift(last, -2)), to: last } },
-    { label: "6 tháng", range: { from: clamp(shift(last, -5)), to: last } },
-    { label: "Tất cả", range: { from: first, to: last } },
+    { label: msg().presets.thisMonth, range: { from: last, to: last } },
+    { label: msg().presets.three, range: { from: clamp(shift(last, -2)), to: last } },
+    { label: msg().presets.six, range: { from: clamp(shift(last, -5)), to: last } },
+    { label: msg().presets.all, range: { from: first, to: last } },
   ];
   const reversed = [...months].reverse();
 
   return (
-    <div className="flex flex-wrap items-end gap-x-4 gap-y-3" role="group" aria-label="Khoảng thời gian">
-      <div className="inline-flex rounded-lg border bg-card p-0.5" role="group" aria-label="Chọn nhanh">
+    <div className="flex flex-wrap items-end gap-x-4 gap-y-3" role="group" aria-label={msg().rangeGroup}>
+      <div className="inline-flex rounded-lg border bg-card p-0.5" role="group" aria-label={msg().quickGroup}>
         {presets.map((p, i) => {
           // Hai nút trùng khoảng (vd. "6 tháng" = "Tất cả" khi mới dùng 6 tháng) → chỉ sáng nút đầu tiên
           const same = (r: StatsRange) => r.from === range.from && r.to === range.to;
@@ -94,7 +98,7 @@ function RangePicker({ range, months, onChange }: { range: StatsRange; months: s
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor="range-from" className="text-[13px] text-muted-foreground">
-          Từ
+          {msg().from}
         </Label>
         <Select value={range.from} onValueChange={(v) => onChange({ from: v, to: v > range.to ? v : range.to })}>
           <SelectTrigger id="range-from" className="w-[150px]">
@@ -109,7 +113,7 @@ function RangePicker({ range, months, onChange }: { range: StatsRange; months: s
           </SelectContent>
         </Select>
         <Label htmlFor="range-to" className="text-[13px] text-muted-foreground">
-          đến
+          {msg().to}
         </Label>
         <Select value={range.to} onValueChange={(v) => onChange({ from: v < range.from ? v : range.from, to: v })}>
           <SelectTrigger id="range-to" className="w-[150px]">
@@ -169,10 +173,10 @@ export function StatsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Thống kê"
+        title={msg().title}
         description={
           <>
-            Số liệu {rangeLabel(range)} · chỉ tính giao dịch đã xác nhận, cùng cách tính với trang Tổng quan · tháng này tính đến{" "}
+            {msg().introBefore(rangeLabel(range))}{" "}
             <span className="num">{formatDate(today)}</span>
           </>
         }
@@ -182,20 +186,20 @@ export function StatsPage() {
 
       {stats.error ? (
         <Panel>
-          <ErrorState title="Không tải được thống kê" error={stats.error} onRetry={stats.refetch} />
+          <ErrorState title={msg().loadFailed} error={stats.error} onRetry={stats.refetch} />
         </Panel>
       ) : noDataAtAll ? (
         <Panel>
           <EmptyState
             icon={ChartColumn}
-            title="Chưa có số liệu để thống kê"
-            description="Ghi vài khoản thu chi hoặc nhập sao kê ngân hàng, biểu đồ sẽ xuất hiện ngay."
+            title={msg().emptyTitle}
+            description={msg().emptyText}
             action={
               <div className="flex flex-wrap justify-center gap-2">
-                <Button onClick={openQuickAdd}>Ghi giao dịch đầu tiên</Button>
+                <Button onClick={openQuickAdd}>{msg().addFirst}</Button>
                 <Button variant="outline" asChild>
                   <Link href="/nhap-sao-ke">
-                    <FileUp aria-hidden /> Nhập sao kê
+                    <FileUp aria-hidden /> {msg().import}
                   </Link>
                 </Button>
               </div>
@@ -204,17 +208,17 @@ export function StatsPage() {
         </Panel>
       ) : (
         <div aria-busy={stats.fetching} className={cn("flex flex-col gap-4 transition-opacity duration-150 md:gap-5 xl:gap-6", stats.fetching && !loading && "opacity-70")}>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 xl:grid-cols-4 xl:gap-6" role="group" aria-label="Chỉ số trong khoảng đã chọn">
-            <Kpi label="Tổng thu" loading={loading} hint={data && <><span className="num">{data.monthCount}</span> tháng</>}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-5 xl:grid-cols-4 xl:gap-6" role="group" aria-label={msg().kpiGroup}>
+            <Kpi label={msg().totalIncome} loading={loading} hint={data && <><span className="num">{data.monthCount}</span> {msg().months}</>}>
               {data && <Money amount={data.totals.income} type="income" withIcon />}
             </Kpi>
-            <Kpi label="Tổng chi" loading={loading} hint={data && <><span className="num">{data.transactionCount}</span> giao dịch</>}>
+            <Kpi label={msg().totalExpense} loading={loading} hint={data && <><span className="num">{data.transactionCount}</span> {msg().transactions}</>}>
               {data && <Money amount={data.totals.expense} type="expense" withIcon />}
             </Kpi>
-            <Kpi label="Chênh lệch thu − chi" loading={loading} hint={data && (data.totals.income >= data.totals.expense ? "Bạn đang để dành được" : "Chi nhiều hơn thu")}>
+            <Kpi label={msg().net} loading={loading} hint={data && (data.totals.income >= data.totals.expense ? msg().saving : msg().overspending)}>
               {data && <span className="num">{formatBalance(data.totals.income - data.totals.expense)}</span>}
             </Kpi>
-            <Kpi label="Chi trung bình mỗi tháng" loading={loading} hint={data && rangeLabel(data.range)}>
+            <Kpi label={msg().avgMonthly} loading={loading} hint={data && rangeLabel(data.range)}>
               {data && <span className="num">{formatMoney(data.totals.expense / Math.max(1, data.monthCount))}</span>}
             </Kpi>
           </div>

@@ -7,6 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Money } from "@/components/money";
 import { formatDate, formatMoney, formatMonthLong, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { dashboardMessages } from "@/i18n/messages/dashboard";
+
+const t = () => getMessages(dashboardMessages);
 
 function KpiCard({
   label,
@@ -33,7 +37,7 @@ function KpiCard({
 
 /** So sánh với cùng kỳ tháng trước: icon + dấu, màu trung tính (không phán xét) */
 function Delta({ current, previous, prevMonthLabel }: { current: number; previous: number; prevMonthLabel: string }) {
-  if (previous === 0) return <span>Chưa có số liệu {prevMonthLabel} để so sánh</span>;
+  if (previous === 0) return <span>{t().kpi.noPrev(prevMonthLabel)}</span>;
   const change = ((current - previous) / previous) * 100;
   const Icon = Math.abs(change) < 0.5 ? Minus : change > 0 ? TrendingUp : TrendingDown;
   return (
@@ -43,14 +47,14 @@ function Delta({ current, previous, prevMonthLabel }: { current: number; previou
         {change > 0 ? "+" : change < 0 ? "−" : ""}
         {formatPercent(Math.abs(change))}
       </span>
-      <span>so với cùng kỳ {prevMonthLabel}</span>
+      <span>{t().kpi.vsPrev(prevMonthLabel)}</span>
     </span>
   );
 }
 
 function prevMonthLabel(month: string) {
   const m = Number(month.split("-")[1]);
-  return `tháng ${m === 1 ? 12 : m - 1}`;
+  return t().kpi.prevMonth(m === 1 ? 12 : m - 1);
 }
 
 export function KpiCards({ summary, loading, today }: { summary?: DashboardSummary; loading: boolean; today: string }) {
@@ -76,35 +80,35 @@ export function KpiCards({ summary, loading, today }: { summary?: DashboardSumma
 
   return (
     <>
-      <KpiCard label="Số dư các ví" icon={Wallet} footer={<span>Tính đến <span className="num">{formatDate(today)}</span></span>}>
+      <KpiCard label={t().kpi.balance} icon={Wallet} footer={<span>{t().kpi.asOf} <span className="num">{formatDate(today)}</span></span>}>
         <Money amount={balance} />
       </KpiCard>
 
       <KpiCard
-        label={`Tổng thu ${formatMonthLong(month).toLowerCase()}`}
+        label={t().kpi.income(formatMonthLong(month))}
         icon={ArrowDownLeft}
         footer={<Delta current={current.income} previous={prev.income} prevMonthLabel={prevLabel} />}
       >
-        {current.income > 0 ? <Money amount={current.income} type="income" /> : <span className="num">0đ</span>}
+        {current.income > 0 ? <Money amount={current.income} type="income" /> : <span className="num">{formatMoney(0)}</span>}
       </KpiCard>
 
       <KpiCard
-        label={`Tổng chi ${formatMonthLong(month).toLowerCase()}`}
+        label={t().kpi.expense(formatMonthLong(month))}
         icon={ArrowUpRight}
         footer={<Delta current={current.expense} previous={prev.expense} prevMonthLabel={prevLabel} />}
       >
-        {current.expense > 0 ? <Money amount={current.expense} type="expense" /> : <span className="num">0đ</span>}
+        {current.expense > 0 ? <Money amount={current.expense} type="expense" /> : <span className="num">{formatMoney(0)}</span>}
       </KpiCard>
 
       <KpiCard
-        label="Ngân sách còn lại"
+        label={t().kpi.budgetLeft}
         icon={PiggyBank}
         footer={
           budgetTotal > 0 ? (
             <div className="flex flex-col gap-1.5">
               <div
                 role="progressbar"
-                aria-label="Mức dùng ngân sách tháng"
+                aria-label={t().kpi.budgetUsage}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(usedRatio * 100)}
@@ -113,13 +117,13 @@ export function KpiCards({ summary, loading, today }: { summary?: DashboardSumma
                 <div className={cn("h-full rounded-full", barColor)} style={{ width: `${Math.min(100, usedRatio * 100)}%` }} />
               </div>
               <span>
-                Đã dùng <span className="num">{formatPercent(usedRatio * 100)}</span> của{" "}
+                {t().kpi.usedOf} <span className="num">{formatPercent(usedRatio * 100)}</span> {t().kpi.of}{" "}
                 <span className="num">{formatMoney(budgetTotal)}</span>
               </span>
             </div>
           ) : (
             <Link href="/ngan-sach" className="font-medium text-primary underline-offset-4 hover:underline">
-              Đặt ngân sách tháng này
+              {t().kpi.setBudget}
             </Link>
           )
         }
@@ -127,7 +131,7 @@ export function KpiCards({ summary, loading, today }: { summary?: DashboardSumma
         {budgetTotal > 0 ? (
           <Money amount={remaining} className={remaining < 0 ? "text-danger" : undefined} />
         ) : (
-          <span className="text-muted-foreground">Chưa đặt</span>
+          <span className="text-muted-foreground">{t().kpi.notSet}</span>
         )}
       </KpiCard>
     </>

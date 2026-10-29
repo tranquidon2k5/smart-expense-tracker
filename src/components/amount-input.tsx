@@ -3,10 +3,10 @@
 import * as React from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { getActiveLocale, getMessages, INTL_LOCALE } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
 
-const vnd = new Intl.NumberFormat("vi-VN");
-
-/** Ô nhập số tiền: tự chèn dấu chấm nghìn, hậu tố "đ", font số Inter tabular */
+/** Ô nhập số tiền: tự chèn dấu phân cách nghìn theo ngôn ngữ, hậu tố "đ"/"₫", font số Inter tabular */
 export function AmountInput({
   value,
   onChange,
@@ -21,7 +21,7 @@ export function AmountInput({
       <Input
         inputMode="numeric"
         autoComplete="off"
-        value={value != null && value > 0 ? vnd.format(value) : ""}
+        value={value != null && value > 0 ? new Intl.NumberFormat(INTL_LOCALE[getActiveLocale()]).format(value) : ""}
         onChange={(e) => {
           const digits = e.target.value.replace(/\D/g, "").slice(0, 13);
           onChange(digits ? Number(digits) : undefined);
@@ -30,7 +30,7 @@ export function AmountInput({
         {...props}
       />
       <span aria-hidden className="num pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground">
-        đ
+        {getMessages(commonMessages).currencySuffix}
       </span>
     </div>
   );

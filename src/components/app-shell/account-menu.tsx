@@ -14,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { authService } from "@/services";
+import { useT } from "@/i18n/provider";
+import { shellMessages } from "@/i18n/messages/shell";
 
 export function initialsOf(name: string) {
   return name.split(" ").at(-1)?.charAt(0).toUpperCase() ?? "";
@@ -22,6 +24,7 @@ export function initialsOf(name: string) {
 /** Menu tài khoản ở góc phải top bar: Cài đặt, Thông báo, Quản trị (admin), Đăng xuất */
 export function AccountMenu({ session, className }: { session: AuthSession; className?: string }) {
   const router = useRouter();
+  const t = useT(shellMessages).account;
   const logout = async () => {
     await authService.logout();
     router.replace("/dang-nhap");
@@ -29,7 +32,7 @@ export function AccountMenu({ session, className }: { session: AuthSession; clas
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className={`rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none ${className ?? ""}`} aria-label={`Tài khoản: ${session.fullName}`}>
+        <button type="button" className={`rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none ${className ?? ""}`} aria-label={t.aria(session.fullName)}>
           <Avatar className="size-9">
             <AvatarFallback className="bg-accent font-semibold text-accent-foreground">{initialsOf(session.fullName)}</AvatarFallback>
           </Avatar>
@@ -43,24 +46,24 @@ export function AccountMenu({ session, className }: { session: AuthSession; clas
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/cai-dat">
-            <Settings aria-hidden /> Cài đặt tài khoản
+            <Settings aria-hidden /> {t.settings}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/thong-bao">
-            <Bell aria-hidden /> Thông báo
+            <Bell aria-hidden /> {t.notifications}
           </Link>
         </DropdownMenuItem>
         {session.role === "admin" && (
           <DropdownMenuItem asChild>
             <Link href="/quan-tri">
-              <ShieldCheck aria-hidden /> Trang quản trị
+              <ShieldCheck aria-hidden /> {t.admin}
             </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void logout()}>
-          <LogOut aria-hidden /> Đăng xuất
+          <LogOut aria-hidden /> {t.logout}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

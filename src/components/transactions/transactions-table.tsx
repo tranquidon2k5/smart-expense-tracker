@@ -44,6 +44,11 @@ import { CategoryChip, CategoryIcon } from "@/components/category-icon";
 import { Money } from "@/components/money";
 import { formatDate, formatMoney, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { transactionsMessages } from "@/i18n/messages/transactions";
+
+const msg = () => getMessages(transactionsMessages);
 
 const features = tableFeatures({
   rowSortingFeature,
@@ -58,11 +63,11 @@ const helper = createColumnHelper<typeof features, TransactionView>();
 
 /** Chip ngắn; độ tin cậy nằm trong tooltip + nhãn đọc màn hình */
 export function PendingChip({ confidence }: { confidence: number | null }) {
-  const detail = confidence != null ? `AI chưa chắc chắn, độ tin cậy ${formatPercent(confidence * 100)}` : "AI chưa chắc chắn";
+  const detail = confidence != null ? msg().aiUnsureConfidence(formatPercent(confidence * 100)) : msg().aiUnsure;
   return (
     <span title={detail} className="inline-flex shrink-0 items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-xs font-medium text-info">
       <Sparkles aria-hidden className="size-3" />
-      Chờ duyệt
+      {msg().pending}
       <span className="sr-only"> — {detail}</span>
     </span>
   );
@@ -97,7 +102,7 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
           id: "select",
           header: ({ table }) => (
             <Checkbox
-              aria-label="Chọn tất cả giao dịch trong trang"
+              aria-label={msg().table.selectAll}
               checked={
                 table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? "indeterminate" : false
               }
@@ -106,7 +111,7 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
           ),
           cell: ({ row }) => (
             <Checkbox
-              aria-label={`Chọn giao dịch ${row.original.description}`}
+              aria-label={msg().table.select(row.original.description)}
               checked={row.getIsSelected()}
               onClick={(e) => {
                 e.preventDefault();
@@ -117,13 +122,13 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
             />
           ),
         }),
-        helper.accessor("date", { id: "date", header: "Ngày", sortFn: "text" }),
-        helper.accessor("description", { id: "description", header: "Mô tả", enableSorting: false }),
-        helper.accessor((t) => t.category.name, { id: "category", header: "Danh mục", sortFn: "text" }),
-        helper.accessor((t) => t.wallet.name, { id: "wallet", header: "Ví", sortFn: "text" }),
+        helper.accessor("date", { id: "date", header: () => msg().table.date, sortFn: "text" }),
+        helper.accessor("description", { id: "description", header: () => msg().table.description, enableSorting: false }),
+        helper.accessor((t) => t.category.name, { id: "category", header: () => msg().table.category, sortFn: "text" }),
+        helper.accessor((t) => t.wallet.name, { id: "wallet", header: () => msg().table.wallet, sortFn: "text" }),
         // Sắp theo độ lớn (không theo dấu) để "giảm dần" = khoản lớn nhất trước, dù thu hay chi
-        helper.accessor("amount", { id: "amount", header: "Số tiền", sortFn: "basic" }),
-        helper.display({ id: "actions", header: () => <span className="sr-only">Thao tác</span> }),
+        helper.accessor("amount", { id: "amount", header: () => msg().table.amount, sortFn: "basic" }),
+        helper.display({ id: "actions", header: () => <span className="sr-only">{getMessages(commonMessages).actions}</span> }),
       ]),
     [],
   );
@@ -193,24 +198,24 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
 
       {/* ≥ 768px: bảng */}
       <div className="max-md:hidden">
-        <Table aria-label="Danh sách giao dịch" containerClassName="overflow-visible">
+        <Table aria-label={msg().table.label} containerClassName="overflow-visible">
           <TableHeader className="sticky top-16 z-10 bg-surface-subtle shadow-[0_1px_0_var(--border)]">
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-10 pr-0 pl-5">
                 <table.FlexRender header={table.getHeaderGroups()[0].headers[0]} />
               </TableHead>
               <TableHead className="w-[112px]" aria-sort={ariaSort("date")}>
-                {sortHeader("date", "Ngày")}
+                {sortHeader("date", msg().table.date)}
               </TableHead>
-              <TableHead>Mô tả</TableHead>
+              <TableHead>{msg().table.description}</TableHead>
               <TableHead className="w-[150px]" aria-sort={ariaSort("category")}>
-                {sortHeader("category", "Danh mục")}
+                {sortHeader("category", msg().table.category)}
               </TableHead>
               <TableHead className="w-[130px] max-lg:hidden" aria-sort={ariaSort("wallet")}>
-                {sortHeader("wallet", "Ví")}
+                {sortHeader("wallet", msg().table.wallet)}
               </TableHead>
               <TableHead className="w-[140px] text-right" aria-sort={ariaSort("amount")}>
-                {sortHeader("amount", "Số tiền", "right")}
+                {sortHeader("amount", msg().table.amount, "right")}
               </TableHead>
               <TableHead className="w-12 pr-3" />
             </TableRow>
@@ -246,7 +251,7 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
                         {t.description}
                       </button>
                       {t.source === "nlp" && t.status !== "pending" && (
-                        <Sparkles aria-label="AI phân loại" className="size-3.5 shrink-0 text-muted-foreground" />
+                        <Sparkles aria-label={msg().aiCategorized} className="size-3.5 shrink-0 text-muted-foreground" />
                       )}
                       {t.status === "pending" && <PendingChip confidence={t.aiConfidence} />}
                     </span>
@@ -264,7 +269,7 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label={`Thao tác cho ${t.description}`}
+                          aria-label={msg().table.actionsFor(t.description)}
                           className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100 [@media(hover:none)]:opacity-100"
                         >
                           <MoreHorizontal aria-hidden />
@@ -272,11 +277,11 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onSelect={() => onOpen(t.id)}>
-                          <PencilLine aria-hidden /> Xem & sửa
+                          <PencilLine aria-hidden /> {msg().table.viewEdit}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem variant="destructive" onSelect={() => onDelete([t.id])}>
-                          <Trash2 aria-hidden /> Xoá
+                          <Trash2 aria-hidden /> {getMessages(commonMessages).delete}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -288,15 +293,15 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
           <TableFooter className="bg-surface-subtle">
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={2} className="pl-5 text-[13px] font-medium text-muted-foreground">
-                Tổng <span className="num">{totalRows}</span> giao dịch đang lọc
+                {msg().table.total} <span className="num">{totalRows}</span> {msg().table.totalFiltered}
               </TableCell>
               <TableCell colSpan={4} className="text-right max-lg:hidden">
                 <span className="inline-flex items-center gap-4 text-[13px]">
                   <span>
-                    Thu <Money amount={totals.income} type="income" className="font-semibold" />
+                    {getMessages(commonMessages).income} <Money amount={totals.income} type="income" className="font-semibold" />
                   </span>
                   <span>
-                    Chi <Money amount={totals.expense} type="expense" className="font-semibold" />
+                    {getMessages(commonMessages).expense} <Money amount={totals.expense} type="expense" className="font-semibold" />
                   </span>
                 </span>
               </TableCell>
@@ -313,7 +318,7 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
       </div>
 
       {/* < 768px: danh sách 2 dòng, không cuộn ngang */}
-      <ul className="md:hidden" aria-label="Danh sách giao dịch">
+      <ul className="md:hidden" aria-label={msg().table.label}>
         {rows.map(({ original: t }) => (
           <li key={t.id} className="border-b last:border-0">
             <button
@@ -345,10 +350,10 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
           <span className="num">
             {start}–{end}
           </span>{" "}
-          trong <span className="num">{totalRows}</span> giao dịch
+          {msg().table.of} <span className="num">{totalRows}</span> {msg().table.transactions}
           <span className="max-md:hidden">
             {" "}
-            · Thu <span className="num">{formatMoney(totals.income)}</span> · Chi{" "}
+            · {getMessages(commonMessages).income} <span className="num">{formatMoney(totals.income)}</span> · {getMessages(commonMessages).expense}{" "}
             <span className="num">{formatMoney(totals.expense)}</span>
           </span>
         </p>
@@ -359,14 +364,14 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
             aria-pressed={dense}
             onClick={() => onDenseChange(!dense)}
             className="text-muted-foreground max-md:hidden"
-            title="Hiển thị gọn: dòng thấp hơn để xem được nhiều hơn"
+            title={msg().table.denseTitle}
           >
-            <Rows3 aria-hidden /> Gọn
+            <Rows3 aria-hidden /> {msg().table.dense}
           </Button>
           <label className="flex items-center gap-2">
-            <span className="max-sm:sr-only">Mỗi trang</span>
+            <span className="max-sm:sr-only">{msg().table.perPage}</span>
             <Select value={String(pageSize)} onValueChange={(v) => table.setPageSize(Number(v))}>
-              <SelectTrigger className="num w-20" aria-label="Số dòng mỗi trang">
+              <SelectTrigger className="num w-20" aria-label={msg().table.rowsPerPage}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -386,7 +391,7 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
             size="icon"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
-            aria-label="Trang trước"
+            aria-label={msg().table.prevPage}
             className="max-md:size-11"
           >
             <ChevronLeft aria-hidden />
@@ -396,7 +401,7 @@ export function TransactionsTable({ data, dense, onDenseChange, onOpen, onDelete
             size="icon"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
-            aria-label="Trang sau"
+            aria-label={msg().table.nextPage}
             className="max-md:size-11"
           >
             <ChevronRight aria-hidden />

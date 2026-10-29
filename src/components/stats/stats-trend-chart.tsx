@@ -12,10 +12,26 @@ import { EmptyState } from "@/components/empty-state";
 import { Money } from "@/components/money";
 import { Panel } from "@/components/panel";
 import { formatBalance, formatCompactMoney, formatDate, formatMoney, formatMonthLong, formatMonthShort } from "@/lib/format";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
+import { statsMessages } from "@/i18n/messages/stats";
+
+const msg = () => getMessages(statsMessages);
+const common = () => getMessages(commonMessages);
 
 const config = {
-  income: { label: "Thu", color: "var(--income)" },
-  expense: { label: "Chi", color: "var(--expense)" },
+  income: {
+    get label() {
+      return common().income;
+    },
+    color: "var(--income)",
+  },
+  expense: {
+    get label() {
+      return common().expense;
+    },
+    color: "var(--expense)",
+  },
 } satisfies ChartConfig;
 
 /** Ký hiệu chú thích: Thu nét đứt / cột viền đứt, Chi nét liền (không chỉ phân biệt bằng màu) */
@@ -79,8 +95,8 @@ export function StatsTrendChart({
   const avg = complete.length ? complete.reduce((s, p) => s + p.expense, 0) / complete.length : 0;
   const summary =
     peak && complete.length > 1
-      ? `Chi trung bình ${formatCompactMoney(avg)}/tháng, cao nhất ${formatMonthLong(peak.month).toLowerCase()} (${formatCompactMoney(peak.expense)})`
-      : "Tổng thu và chi của từng tháng trong khoảng đã chọn";
+      ? msg().trend.summary(formatCompactMoney(avg), formatMonthLong(peak.month), formatCompactMoney(peak.expense))
+      : msg().trend.fallback;
 
   const lastIndex = points.length - 1;
   const endLabel = (key: "income" | "expense") =>
@@ -88,7 +104,7 @@ export function StatsTrendChart({
       if (props.index !== lastIndex || props.x == null || props.y == null) return <g />;
       return (
         <text x={Number(props.x) + 10} y={Number(props.y)} dy={4} fontSize={12} fontWeight={600} fill={`var(--${key})`}>
-          {key === "income" ? "Thu" : "Chi"}
+          {key === "income" ? common().income : common().expense}
         </text>
       );
     };
@@ -115,14 +131,14 @@ export function StatsTrendChart({
 
   return (
     <Panel
-      title="Xu hướng thu chi theo tháng"
+      title={msg().trend.title}
       description={summary}
       className={className}
       action={
         hasData && (
           <Button variant="ghost" size="sm" onClick={() => setAsTable((v) => !v)} aria-pressed={asTable} className="text-muted-foreground max-md:h-11">
             {asTable ? asLine ? <ChartLine aria-hidden /> : <ChartColumn aria-hidden /> : <Table2 aria-hidden />}
-            {asTable ? "Xem biểu đồ" : "Xem dạng bảng"}
+            {asTable ? msg().showChart : msg().showTable}
           </Button>
         )
       }
@@ -133,15 +149,15 @@ export function StatsTrendChart({
           <Skeleton className="flex-1" />
         </div>
       ) : !hasData ? (
-        <EmptyState icon={ChartLine} className="h-[280px]" title="Chưa có thu chi trong khoảng này" description="Chọn khoảng thời gian khác hoặc ghi thêm giao dịch." />
+        <EmptyState icon={ChartLine} className="h-[280px]" title={msg().trend.emptyTitle} description={msg().trend.emptyText} />
       ) : asTable ? (
-        <Table aria-label="Thu chi theo tháng">
+        <Table aria-label={msg().trend.tableLabel}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Tháng</TableHead>
-              <TableHead className="text-right">Thu</TableHead>
-              <TableHead className="text-right">Chi</TableHead>
-              <TableHead className="text-right">Chênh lệch</TableHead>
+              <TableHead>{msg().month}</TableHead>
+              <TableHead className="text-right">{common().income}</TableHead>
+              <TableHead className="text-right">{common().expense}</TableHead>
+              <TableHead className="text-right">{msg().netShort}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -152,7 +168,7 @@ export function StatsTrendChart({
                   {p.month === currentMonth && (
                     <span className="text-muted-foreground">
                       {" "}
-                      (đến <span className="num">{formatDate(today)}</span>)
+                      ({msg().until} <span className="num">{formatDate(today)}</span>)
                     </span>
                   )}
                 </TableCell>
@@ -171,19 +187,19 @@ export function StatsTrendChart({
         <div className="flex flex-1 flex-col">
           <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]" aria-hidden>
             <span className="flex items-center gap-1.5">
-              <Swatch dashed bar={!asLine} color="var(--income)" /> Thu
+              <Swatch dashed bar={!asLine} color="var(--income)" /> {common().income}
             </span>
             <span className="flex items-center gap-1.5">
-              <Swatch bar={!asLine} color="var(--expense)" /> Chi
+              <Swatch bar={!asLine} color="var(--expense)" /> {common().expense}
             </span>
             {points.some((p) => p.month === currentMonth) && (
               <span className="text-muted-foreground">
-                {formatMonthShort(currentMonth)}* tính đến <span className="num">{formatDate(today)}</span>
+                {formatMonthShort(currentMonth)}* {msg().upTo} <span className="num">{formatDate(today)}</span>
               </span>
             )}
           </div>
           <p className="sr-only">
-            {points.map((p) => `${formatMonthLong(p.month)}: thu ${formatMoney(p.income)}, chi ${formatMoney(p.expense)}`).join(". ")}
+            {points.map((p) => msg().trend.srPoint(formatMonthLong(p.month), formatMoney(p.income), formatMoney(p.expense))).join(". ")}
           </p>
           <ChartContainer config={config} className="aspect-auto h-[280px] w-full xl:h-auto xl:min-h-[280px] xl:flex-1">
             {asLine ? (

@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { cn } from "cn"
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
 import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
@@ -77,7 +79,7 @@ function SheetContent({
             >
               <XIcon
               />
-              <span className="sr-only">Đóng</span>
+              <span className="sr-only">{getMessages(commonMessages).close}</span>
             </Button>
           </SheetPrimitive.Close>
         )}

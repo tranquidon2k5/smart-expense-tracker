@@ -6,6 +6,8 @@ import * as React from "react";
 import { toast } from "sonner";
 import { onCelebrate, type Celebration } from "@/services";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
 import { AchievementIcon } from "./achievement-icon";
 
 const CONFETTI_COLORS = ["var(--streak)", "var(--xp)", "var(--primary)", "#DB2777", "#2563EB"];
@@ -96,14 +98,14 @@ function CelebrationCard({ c, onClose, onPause }: { c: Celebration; onClose: () 
               <span className="num rounded-md bg-xp-soft px-1.5 py-0.5 text-xs font-semibold text-xp-text">+{c.xp} XP</span>
             ) : null}
             <Link href="/thanh-tich" onClick={onClose} className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline">
-              <Trophy aria-hidden className="size-4" /> Xem thành tích
+              <Trophy aria-hidden className="size-4" /> {getMessages(commonMessages).celebration.viewAchievements}
             </Link>
           </div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Đóng thông báo chúc mừng"
+          aria-label={getMessages(commonMessages).celebration.dismiss}
           className="absolute -top-1 -right-1 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-row-hover hover:text-foreground"
         >
           <X aria-hidden className="size-4" />

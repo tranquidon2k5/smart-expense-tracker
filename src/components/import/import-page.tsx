@@ -8,11 +8,14 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { importService, transactionService } from "@/services";
 import { normalize } from "@/lib/text";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { importMessages } from "@/i18n/messages/import";
+
+const msg = () => getMessages(importMessages);
 import { FileStep } from "./file-step";
 import { MappingStep } from "./mapping-step";
 import { ResultStep } from "./result-step";
 
-const STEPS = ["Chọn file", "Ánh xạ cột", "Kết quả"] as const;
 type Step = 1 | 2 | 3;
 const EMPTY_MAPPING: CsvColumnMapping = { date: null, amount: null, description: null };
 
@@ -24,9 +27,9 @@ function guessWallet(fileName: string, wallets: Wallet[] | undefined): string | 
 
 function Stepper({ step }: { step: Step }) {
   return (
-    <nav aria-label="Các bước nhập sao kê">
+    <nav aria-label={msg().stepsLabel}>
       <ol className="flex items-center gap-2 md:gap-3">
-        {STEPS.map((label, i) => {
+        {msg().steps.map((label, i) => {
           const n = (i + 1) as Step;
           const done = n < step;
           const current = n === step;
@@ -46,8 +49,8 @@ function Stepper({ step }: { step: Step }) {
               </span>
               <span className={cn("text-sm", current ? "font-semibold" : "text-muted-foreground", !current && "max-sm:sr-only")}>
                 <span className="sr-only">
-                  Bước {n}
-                  {done ? " (đã xong)" : ""}:{" "}
+                  {msg().step(n)}
+                  {done ? msg().stepDone : ""}:{" "}
                 </span>
                 {label}
               </span>
@@ -117,12 +120,12 @@ export function ImportPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Nhập sao kê"
-        description="Đưa giao dịch từ file CSV của ngân hàng hoặc ví điện tử vào Sổ Tiền. Giao dịch trùng được bỏ qua, khoản AI chưa chắc sẽ chờ bạn duyệt."
+        title={msg().title}
+        description={msg().intro}
       />
       <Stepper step={step} />
       <h2 ref={headingRef} tabIndex={-1} className="sr-only">
-        Bước {step}: {STEPS[step - 1]}
+        {msg().step(step)}: {msg().steps[step - 1]}
       </h2>
 
       {step === 1 && <FileStep parsed={parsed} onParsed={onParsed} onNext={() => goTo(2)} />}

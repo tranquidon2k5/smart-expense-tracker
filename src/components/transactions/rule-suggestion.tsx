@@ -13,6 +13,11 @@ import { useServiceQuery } from "@/hooks/use-service-query";
 import { transactionService } from "@/services";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { transactionsMessages } from "@/i18n/messages/transactions";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(transactionsMessages);
 
 function useDebounced<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = React.useState(value);
@@ -36,18 +41,18 @@ function PreviewRow({ item, target }: { item: RulePreviewItem; target?: Category
         </span>
       </span>
       {item.typeMismatch ? (
-        <span className="text-muted-foreground">Bỏ qua · khác loại thu/chi</span>
+        <span className="text-muted-foreground">{msg().rule.skipped}</span>
       ) : item.conflict ? (
         <span className="flex items-center gap-1.5">
           <TriangleAlert aria-hidden className="size-3.5 shrink-0 text-warning" />
-          <span className="sr-only">Cảnh báo: đang ở danh mục khác, sẽ bị đổi từ</span>
+          <span className="sr-only">{msg().rule.conflictSr}</span>
           <CategoryChip name={t.category.name} color={t.category.color} />
-          <ArrowRight aria-label="sang" className="size-3.5 text-muted-foreground" />
+          <ArrowRight aria-label={msg().rule.to} className="size-3.5 text-muted-foreground" />
           {target && <CategoryChip name={target.name} color={target.color} className="font-medium" />}
         </span>
       ) : (
         <span className="flex items-center gap-1.5 text-muted-foreground">
-          {target && <CategoryChip name={target.name} color={target.color} />} · giữ nguyên, chỉ xác nhận
+          {target && <CategoryChip name={target.name} color={target.color} />} · {msg().rule.keep}
         </span>
       )}
     </li>
@@ -101,14 +106,14 @@ export function RuleSuggestionPrompt({
     setError(null);
     try {
       const { rule, appliedCount } = await transactionService.createRule(keyword, suggestion.categoryId, willApply);
-      toast.success(`Đã tạo luật “${rule.keyword}” → ${category?.name ?? ""}`, {
+      toast.success(msg().rule.created(rule.keyword, category?.name ?? ""), {
         description: appliedCount
-          ? `Đã phân loại thêm ${appliedCount} giao dịch chờ duyệt theo luật mới.`
-          : "Lần sau giao dịch có từ khoá này sẽ được phân loại tự động.",
+          ? msg().rule.applied(appliedCount)
+          : msg().rule.future,
       });
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chưa tạo được luật, bạn thử lại nhé.");
+      setError(e instanceof Error ? te(e.message) : msg().rule.failed);
       setSaving(false);
     }
   };
@@ -128,12 +133,12 @@ export function RuleSuggestionPrompt({
         <WandSparkles aria-hidden className="mt-0.5 size-5 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
           <h3 id={`${ids}-title`} className="text-[15px] font-semibold">
-            Tạo luật mới cho từ khoá này?
+            {msg().rule.title}
           </h3>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Lần sau giao dịch chứa từ khoá sẽ tự vào{" "}
+            {msg().rule.introBefore}{" "}
             {category && <CategoryChip name={category.name} color={category.color} className="align-middle text-sm text-foreground" />}
-            , không cần AI đoán.
+            {msg().rule.introAfter}
           </p>
 
           <form
@@ -146,7 +151,7 @@ export function RuleSuggestionPrompt({
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-40 flex-1">
                 <label htmlFor={`${ids}-kw`} className="mb-1 block text-[13px] font-medium">
-                  Từ khoá
+                  {msg().rule.keyword}
                 </label>
                 <Input
                   id={`${ids}-kw`}
@@ -159,7 +164,7 @@ export function RuleSuggestionPrompt({
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="ghost" onClick={onDone} disabled={saving} className="max-md:h-11">
-                  Bỏ qua <kbd className="num ml-1 hidden rounded border px-1 text-[11px] md:inline">Esc</kbd>
+                  {msg().rule.skip} <kbd className="num ml-1 hidden rounded border px-1 text-[11px] md:inline">Esc</kbd>
                 </Button>
                 <Button
                   type="submit"
@@ -171,24 +176,23 @@ export function RuleSuggestionPrompt({
                   {saving || waitingPreview ? <Loader2 aria-hidden className="animate-spin" /> : null}
                   {willApply ? (
                     <>
-                      Tạo luật & áp dụng cho <span className="num">{applicable}</span>
+                      {msg().rule.createApply} <span className="num">{applicable}</span>
                     </>
                   ) : (
-                    "Tạo luật"
+                    msg().rule.create
                   )}
                 </Button>
               </div>
             </div>
             <p id={`${ids}-kw-hint`} className="-mt-1 text-xs text-muted-foreground">
-              Từ khoá càng cụ thể càng ít phân loại nhầm, vd. “GRAB*RIDE” thay vì “GRAB”.
+              {msg().rule.hint}
             </p>
 
             {applicable > 0 && (
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox checked={applyToPending} onCheckedChange={(v) => setApplyToPending(v === true)} />
                 <span>
-                  Áp dụng luôn cho <span className="num font-medium">{applicable}</span> giao dịch chờ duyệt khác có từ khoá
-                  này
+                  {msg().rule.applyBefore} <span className="num font-medium">{applicable}</span> {msg().rule.applyAfter}
                 </span>
               </label>
             )}
@@ -199,22 +203,21 @@ export function RuleSuggestionPrompt({
                   <p role="alert" className="flex items-start gap-2 rounded-lg border border-warning/40 bg-card px-3 py-2 text-sm">
                     <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-warning" />
                     <span>
-                      <span className="num font-semibold">{conflicts}</span> giao dịch đang thuộc danh mục khác và sẽ bị đổi sang{" "}
-                      <strong>{category?.name}</strong>. Kiểm tra danh sách bên dưới hoặc dùng từ khoá cụ thể hơn.
+                      {msg().rule.conflicts(conflicts, category?.name ?? "")}
                     </span>
                   </p>
                 )}
                 <div className="overflow-hidden rounded-lg border bg-card">
                   <p className="flex items-center justify-between border-b bg-surface-subtle px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                    <span>Xem trước giao dịch sẽ được phân loại lại</span>
-                    {preview.fetching && <Loader2 aria-label="Đang cập nhật xem trước" className="size-3.5 animate-spin" />}
+                    <span>{msg().rule.previewTitle}</span>
+                    {preview.fetching && <Loader2 aria-label={msg().rule.previewUpdating} className="size-3.5 animate-spin" />}
                   </p>
                   {items.length === 0 ? (
                     <p className="px-3 py-3 text-[13px] text-muted-foreground">
-                      Không có giao dịch chờ duyệt nào khớp từ khoá “{keyword.trim().toUpperCase()}”.
+                      {msg().rule.previewEmpty(keyword.trim().toUpperCase())}
                     </p>
                   ) : (
-                    <ul aria-label="Giao dịch sẽ bị ảnh hưởng" className="max-h-56 divide-y overflow-y-auto">
+                    <ul aria-label={msg().rule.affected} className="max-h-56 divide-y overflow-y-auto">
                       {items.map((item) => (
                         <PreviewRow key={item.transaction.id} item={item} target={category} />
                       ))}

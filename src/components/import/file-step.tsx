@@ -7,9 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/panel";
 import { importService } from "@/services";
 import { cn } from "@/lib/utils";
+import { getMessages } from "@/i18n/core";
+import { importMessages } from "@/i18n/messages/import";
+import { te } from "@/i18n/errors";
+
+const msg = () => getMessages(importMessages);
 import { CsvPreviewTable } from "./csv-preview-table";
 
-const DELIMITER_LABEL: Record<string, string> = { ",": "dấu phẩy", ";": "dấu chấm phẩy", "\t": "tab", "|": "dấu gạch đứng" };
 
 /**
  * Bước 1: kéo thả hoặc chọn file CSV → đọc thật nội dung file → xem trước vài dòng đầu.
@@ -39,7 +43,7 @@ export function FileStep({
       const result = await job();
       if (seq === readSeq.current) onParsed(result);
     } catch (e) {
-      if (seq === readSeq.current) setError(e instanceof Error ? e.message : "Không đọc được file.");
+      if (seq === readSeq.current) setError(e instanceof Error ? te(e.message) : msg().file.readFailed);
     } finally {
       if (seq === readSeq.current) setReading(null);
     }
@@ -52,7 +56,7 @@ export function FileStep({
   return (
     <div className="grid grid-cols-1 items-start gap-4 md:gap-5 xl:grid-cols-12 xl:gap-6">
       <div className="flex flex-col gap-4 md:gap-5 xl:col-span-8 xl:gap-6">
-        <Panel title="Chọn file sao kê" description="Kéo thả file vào khung bên dưới hoặc bấm nút để chọn từ máy.">
+        <Panel title={msg().file.pickTitle} description={msg().file.pickText}>
           <div
             onDragEnter={(e) => {
               e.preventDefault();
@@ -77,18 +81,18 @@ export function FileStep({
             </span>
             {reading ? (
               <p role="status" className="text-[15px] font-medium">
-                Đang đọc “{reading}”…
+                {msg().file.reading(reading)}
               </p>
             ) : (
               <>
-                <p className="text-[15px] font-medium">{dragging ? "Thả file vào đây" : "Kéo thả file CSV vào đây"}</p>
+                <p className="text-[15px] font-medium">{dragging ? msg().file.drop : msg().file.drag}</p>
                 <p className="text-sm text-muted-foreground">
-                  hoặc
+                  {msg().file.or}
                 </p>
                 <Button onClick={() => inputRef.current?.click()} className="max-md:h-11">
-                  <FileSpreadsheet aria-hidden /> Chọn file CSV
+                  <FileSpreadsheet aria-hidden /> {msg().file.choose}
                 </Button>
-                <p className="text-xs text-muted-foreground">Tối đa 2 MB · 5.000 dòng · mã UTF-8 hoặc Windows-1258</p>
+                <p className="text-xs text-muted-foreground">{msg().file.limits}</p>
               </>
             )}
             <input
@@ -97,7 +101,7 @@ export function FileStep({
               accept=".csv,text/csv"
               className="sr-only"
               tabIndex={-1}
-              aria-label="Chọn file CSV"
+              aria-label={msg().file.choose}
               onChange={(e) => {
                 readFile(e.target.files?.[0]);
                 e.target.value = "";
@@ -109,7 +113,7 @@ export function FileStep({
             <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg bg-expense-soft px-3 py-2.5 text-sm text-foreground">
               <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-danger" />
               <div>
-                <p className="font-medium">Không nhập được file này</p>
+                <p className="font-medium">{msg().file.cantImport}</p>
                 <p className="mt-0.5">{error}</p>
               </div>
             </div>
@@ -126,31 +130,27 @@ export function FileStep({
             }
             description={
               <>
-                <span className="num">{parsed.rows.length}</span> dòng dữ liệu · <span className="num">{parsed.headers.length}</span> cột ·
-                ngăn cách bằng {DELIMITER_LABEL[parsed.delimiter] ?? parsed.delimiter}
-                {parsed.hasHeader ? "" : " · không có dòng tiêu đề"}. Dưới đây là 5 dòng đầu.
+                <span className="num">{parsed.rows.length}</span> {msg().file.rows} · <span className="num">{parsed.headers.length}</span> {msg().file.columns} ·{" "}
+                {msg().file.separatedBy(msg().file.delimiters[parsed.delimiter] ?? parsed.delimiter)}
+                {parsed.hasHeader ? "" : msg().file.noHeader}
+                {msg().file.firstRows}
               </>
             }
           >
             <CsvPreviewTable parsed={parsed} limit={5} />
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button variant="outline" onClick={() => inputRef.current?.click()}>
-                Chọn file khác
+                {msg().file.another}
               </Button>
-              <Button onClick={onNext}>Tiếp tục: ánh xạ cột</Button>
+              <Button onClick={onNext}>{msg().file.next}</Button>
             </div>
           </Panel>
         )}
       </div>
 
-      <Panel title="File cần có gì" className="xl:col-span-4">
+      <Panel title={msg().file.needsTitle} className="xl:col-span-4">
         <ul className="flex flex-col gap-2 text-sm">
-          {[
-            "Định dạng CSV (từ Excel: Tệp › Lưu thành › CSV UTF-8)",
-            "Ít nhất 3 cột: ngày, số tiền, nội dung giao dịch",
-            "Ngày dạng dd/MM/yyyy, ví dụ 07/10/2026",
-            "Số tiền âm là khoản chi; nếu file chỉ có số dương, bạn chọn được ở bước sau",
-          ].map((t) => (
+          {msg().file.needs.map((t) => (
             <li key={t} className="flex items-start gap-2">
               <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
               {t}
@@ -158,7 +158,7 @@ export function FileStep({
           ))}
         </ul>
 
-        <h3 className="mt-5 mb-2 text-sm font-semibold">Chưa có file? Dùng thử file mẫu</h3>
+        <h3 className="mt-5 mb-2 text-sm font-semibold">{msg().file.samplesTitle}</h3>
         <ul className="flex flex-col divide-y">
           {importService.SAMPLE_FILES.map((s) => (
             <li key={s.href} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
@@ -174,11 +174,11 @@ export function FileStep({
                   onClick={() => void read(s.name, () => importService.readSampleFile(s.href))}
                   className="max-md:h-11"
                 >
-                  <Play aria-hidden /> Dùng file này
+                  <Play aria-hidden /> {msg().file.useSample}
                 </Button>
                 <Button size="sm" variant="ghost" asChild className="text-muted-foreground max-md:h-11">
                   <a href={s.href} download>
-                    <Download aria-hidden /> Tải về
+                    <Download aria-hidden /> {msg().file.download}
                   </a>
                 </Button>
               </div>

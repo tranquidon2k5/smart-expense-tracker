@@ -9,6 +9,10 @@ import { CategoryChip } from "@/components/category-icon";
 import { Money } from "@/components/money";
 import { Panel } from "@/components/panel";
 import { formatDate, formatPercent } from "@/lib/format";
+import { getMessages } from "@/i18n/core";
+import { importMessages } from "@/i18n/messages/import";
+
+const msg = () => getMessages(importMessages);
 import { cn } from "@/lib/utils";
 import { ErrorList } from "./mapping-step";
 
@@ -49,63 +53,63 @@ export function ResultStep({ result, onRestart }: { result: ImportResult; onRest
         title={
           created.length ? (
             <span>
-              Đã nhập <span className="num">{created.length}</span> giao dịch vào {result.wallet.name}
+              {msg().result.imported} <span className="num">{created.length}</span> {msg().result.into(result.wallet.name)}
             </span>
           ) : (
-            "Không có giao dịch mới nào"
+            msg().result.none
           )
         }
         icon={<CircleCheck aria-hidden className="size-5 text-success" />}
         description={
           created.length
-            ? `Từ file ${result.fileName}. Giao dịch AI chắc chắn đã được ghi thẳng; số còn lại chờ bạn duyệt.`
-            : `Mọi dòng trong ${result.fileName} đều trùng với giao dịch đã có hoặc không đọc được.`
+            ? msg().result.fromFile(result.fileName)
+            : msg().result.allDup(result.fileName)
         }
       >
-        <dl className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-y-0 md:grid-cols-4 md:divide-x" role="group" aria-label="Tóm tắt kết quả">
-          <Stat icon={ReceiptText} label="Giao dịch mới" value={created.length} hint="đã thêm vào sổ" tone="bg-accent text-primary" />
+        <dl className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-y-0 md:grid-cols-4 md:divide-x" role="group" aria-label={msg().result.summary}>
+          <Stat icon={ReceiptText} label={msg().result.newTx} value={created.length} hint={msg().result.added} tone="bg-accent text-primary" />
           <Stat
             icon={CircleCheck}
-            label="Ghi thẳng"
+            label={msg().result.direct}
             value={result.confirmedCount}
-            hint="AI tin cậy từ 70%"
+            hint={msg().result.directHint}
             tone="bg-income-soft text-success"
           />
-          <Stat icon={Hourglass} label="Vào Chờ duyệt" value={result.pendingCount} hint="AI chưa chắc, cần bạn xem" tone="bg-info-soft text-info" />
-          <Stat icon={CopyX} label="Trùng, đã loại" value={duplicates.length} hint="không nhập lại" tone="bg-muted text-muted-foreground" />
+          <Stat icon={Hourglass} label={msg().result.toReview} value={result.pendingCount} hint={msg().result.toReviewHint} tone="bg-info-soft text-info" />
+          <Stat icon={CopyX} label={msg().result.dup} value={duplicates.length} hint={msg().result.dupHint} tone="bg-muted text-muted-foreground" />
         </dl>
 
         <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
           {result.pendingCount > 0 && (
             <Button asChild>
               <Link href="/giao-dich?trang-thai=cho-duyet">
-                <ListChecks aria-hidden /> Duyệt {result.pendingCount} giao dịch chờ
+                <ListChecks aria-hidden /> {msg().result.review(result.pendingCount)}
               </Link>
             </Button>
           )}
           <Button variant={result.pendingCount > 0 ? "outline" : "default"} asChild>
-            <Link href={`/giao-dich?vi=${result.wallet.id}`}>Xem giao dịch của {result.wallet.name}</Link>
+            <Link href={`/giao-dich?vi=${result.wallet.id}`}>{msg().result.viewWallet(result.wallet.name)}</Link>
           </Button>
           <Button variant="ghost" onClick={onRestart} className="sm:ml-auto">
-            <FileUp aria-hidden /> Nhập file khác
+            <FileUp aria-hidden /> {msg().result.another}
           </Button>
         </div>
       </Panel>
 
       {duplicates.length > 0 && (
         <Panel
-          title={`${duplicates.length} giao dịch trùng đã bị loại`}
+          title={msg().result.dupTitle(duplicates.length)}
           icon={<CopyX aria-hidden className="size-5 text-muted-foreground" />}
-          description="Trùng khi cùng ngày, cùng số tiền và cùng loại thu/chi với giao dịch đã có trong ví, hoặc lặp lại y hệt một dòng khác trong file."
+          description={msg().result.dupText}
         >
-          <Table aria-label="Giao dịch trùng đã bị loại" containerClassName="max-h-[400px] overflow-y-auto rounded-lg border">
+          <Table aria-label={msg().result.dupLabel} containerClassName="max-h-[400px] overflow-y-auto rounded-lg border">
             <TableHeader className="sticky top-0 z-10">
               <TableRow className="bg-surface-subtle hover:bg-surface-subtle">
-                <TableHead className="w-16 px-3 text-right">Dòng</TableHead>
-                <TableHead className="w-28 px-3">Ngày</TableHead>
-                <TableHead className="px-3">Nội dung trong file</TableHead>
-                <TableHead className="px-3">Trùng với</TableHead>
-                <TableHead className="w-36 px-3 text-right">Số tiền</TableHead>
+                <TableHead className="w-16 px-3 text-right">{msg().row}</TableHead>
+                <TableHead className="w-28 px-3">{msg().result.date}</TableHead>
+                <TableHead className="px-3">{msg().result.fileContent}</TableHead>
+                <TableHead className="px-3">{msg().result.matches}</TableHead>
+                <TableHead className="w-36 px-3 text-right">{msg().result.amount}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -121,13 +125,13 @@ export function ResultStep({ result, onRestart }: { result: ImportResult; onRest
                       <Link
                         href={`/giao-dich?id=${d.matchId}`}
                         className="text-primary underline-offset-4 hover:underline"
-                        title={`Giao dịch đã có: ${d.matchDescription}`}
+                        title={msg().result.existing(d.matchDescription ?? "")}
                       >
                         {d.matchDescription}
                       </Link>
                     ) : (
                       <span className="text-muted-foreground">
-                        Dòng <span className="num">{d.matchLine}</span> trong file
+                        <span className="num">{msg().result.lineInFile(d.matchLine ?? 0)}</span>
                       </span>
                     )}
                   </TableCell>
@@ -143,18 +147,18 @@ export function ResultStep({ result, onRestart }: { result: ImportResult; onRest
 
       {created.length > 0 && (
         <Panel
-          title="Giao dịch mới"
+          title={msg().result.newTx}
           icon={<Sparkles aria-hidden className="size-5 text-info" />}
-          description="AI phân loại hàng loạt: luật từ khoá của bạn chạy trước, không khớp thì AI đoán kèm độ tin cậy."
+          description={msg().result.newText}
         >
-          <Table aria-label="Giao dịch mới đã nhập" containerClassName="rounded-lg border">
+          <Table aria-label={msg().result.newLabel} containerClassName="rounded-lg border">
             <TableHeader>
               <TableRow className="bg-surface-subtle hover:bg-surface-subtle">
-                <TableHead className="w-28 px-3">Ngày</TableHead>
-                <TableHead className="px-3">Nội dung</TableHead>
-                <TableHead className="px-3">Danh mục</TableHead>
-                <TableHead className="px-3">Trạng thái</TableHead>
-                <TableHead className="w-36 px-3 text-right">Số tiền</TableHead>
+                <TableHead className="w-28 px-3">{msg().result.date}</TableHead>
+                <TableHead className="px-3">{msg().result.content}</TableHead>
+                <TableHead className="px-3">{msg().result.category}</TableHead>
+                <TableHead className="px-3">{msg().result.status}</TableHead>
+                <TableHead className="w-36 px-3 text-right">{msg().result.amount}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -170,12 +174,12 @@ export function ResultStep({ result, onRestart }: { result: ImportResult; onRest
                   <TableCell className="px-3">
                     {t.status === "pending" ? (
                       <span className="inline-flex items-center gap-1 rounded-md bg-info-soft px-1.5 py-0.5 text-xs font-medium text-info">
-                        <Hourglass aria-hidden className="size-3.5" /> Chờ duyệt ·{" "}
+                        <Hourglass aria-hidden className="size-3.5" /> {msg().result.pending} ·{" "}
                         <span className="num">{formatPercent((t.aiConfidence ?? 0) * 100)}</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <CircleCheck aria-hidden className="size-3.5 text-success" /> Đã ghi ·{" "}
+                        <CircleCheck aria-hidden className="size-3.5 text-success" /> {msg().result.logged} ·{" "}
                         <span className="num">{formatPercent((t.aiConfidence ?? 0) * 100)}</span>
                       </span>
                     )}
@@ -192,9 +196,9 @@ export function ResultStep({ result, onRestart }: { result: ImportResult; onRest
 
       {errors.length > 0 && (
         <Panel
-          title={`${errors.length} dòng lỗi đã bỏ qua`}
+          title={msg().result.errTitle(errors.length)}
           icon={<TriangleAlert aria-hidden className="size-5 text-warning" />}
-          description="Sửa các dòng này trong file rồi nhập lại; những dòng đã nhập sẽ được nhận ra là trùng."
+          description={msg().result.errText}
         >
           <ErrorList errors={errors} />
         </Panel>

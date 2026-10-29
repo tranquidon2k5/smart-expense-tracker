@@ -5,13 +5,15 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import type { AuthSession } from "@/types";
 import { useSession } from "@/hooks/use-session";
+import { getMessages } from "@/i18n/core";
+import { commonMessages } from "@/i18n/messages/common";
 
 /** Màn chờ khi chưa biết phiên (trước hydrate) hoặc đang chuyển sang trang Đăng nhập */
-export function SessionPending({ label = "Đang mở Sổ Tiền…" }: { label?: string }) {
+export function SessionPending({ label }: { label?: string }) {
   return (
     <div role="status" className="flex min-h-svh items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
       <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" />
-      {label}
+      {label ?? getMessages(commonMessages).sessionPending}
     </div>
   );
 }
